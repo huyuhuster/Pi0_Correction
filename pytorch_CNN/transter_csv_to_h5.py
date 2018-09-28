@@ -5,25 +5,25 @@ import matplotlib.pyplot as plt
 import tables
 import os
 
-#def csv_h5(csvfile,hdffile, h5key):
-#	mydf = pd.read_csv(csvfile)
-#	mydf = mydf[(mydf.theta>0.561996) & (mydf.theta<2.2463)]
-#	mydf.to_hdf(hdffile, key=h5key, mode='w')
-#	print(mydf.head())
-#	for column in mydf.columns:
-#		print(column)
+# def csv_h5(csvfile,hdffile, h5key):
+#    mydf = pd.read_csv(csvfile)
+#    mydf = mydf[(mydf.theta>0.561996) & (mydf.theta<2.2463)]
+#    mydf.to_hdf(hdffile, key=h5key, mode='w')
+#    print(mydf.head())
+#    for column in mydf.columns:
+#    	print(column)
 
 def csv_h5(csvfile,hdffile, h5key):
 	reader = pd.read_csv(csvfile, chunksize = 300000)
-#	chunk5 = reader.get_chunk(5)
-#	print(chunk5)
+    # chunk5 = reader.get_chunk(5)
+    # print(chunk5)
 	i = 0
 	for chunk in reader:
 		print('chunk:',i)
 		i = i+1
 		chunk.to_hdf(hdffile, key=h5key, append = True, mode='a')
-#		if i>10:
-#			break
+        # if i>10:
+        #   break
 
 def read_h5(hdffile, h5key):
 	i = 0
@@ -82,7 +82,7 @@ def modified_h5(hdffile, hdffile_m, h5key):
 			mydf_readd5['CSCTheta_'+str(i)] = mydf_readd5['CSCid_'+str(i)].map(str).map(id_theta)
 			mydf_readd5['CSCPhi_'+str(i)] = mydf_readd5['CSCid_'+str(i)].map(str).map(id_phi)
        
-#   Standardization 
+        # ****** Standardization 
 		mydf_readd5[index_list_CSE] = ((mydf_readd5[index_list_CSE].T - mydf_readd5[index_list_CSE].T.mean()) / mydf_readd5[index_list_CSE].T.std()).T
 		mydf_readd5[index_list_CSCTheta] = (mydf_readd5[index_list_CSCTheta] - mydf_readd5[index_list_CSCTheta].stack().mean())/ mydf_readd5[index_list_CSCTheta].stack().std()
 		mydf_readd5[index_list_CSCPhi] = (mydf_readd5[index_list_CSCPhi] - mydf_readd5[index_list_CSCPhi].stack().mean())/ mydf_readd5[index_list_CSCPhi].stack().std()
@@ -105,6 +105,6 @@ hdffile = 'B2APi0selection_' + ID + '_crystal_addmcMatchWeight.h5'
 hdffile_m = 'B2APi0selection_' + ID + '_crystal_addmcMatchWeight_modified.h5'
 h5key = 'crystal_' + ID
 
-#csv_h5(csvfile,hdffile, h5key)
-#read_h5(hdffile_m, h5key)
+# csv_h5(csvfile,hdffile, h5key)
+# read_h5(hdffile_m, h5key)
 modified_h5(hdffile, hdffile_m, h5key)

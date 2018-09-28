@@ -47,175 +47,176 @@ class Net(nn.Module):
         return x
  
 
-def train(h5file, h5key, pklfile, trainedh5, trainedlossplot, train_target):
+def train(h5files, h5keys, pklfile, trainedh5, trainedlossplot, train_target):
 
         # ****** Input dataset from h5, then divide it into train dataset and test dataset(10:1)
         # mydf_readd5 = pd.concat([mydf_readd5_1, mydf_readd5_2])
         for epoch in range(EPOCH):
            print(epoch,"  th round:")
-           mydf_readd5 = pd.read_hdf(h5file, h5key, start=0, stop= 20000000)
+		   for h5file, h5key in zip(h5files, h5keys):
+              reader = pd.read_hdf(h5file, h5key, chunksize=5000000)
+              for mydf_readd5 in  reader:
+                 mydf_train = mydf_readd5.iloc[: int(mydf_readd5.shape[0]*15/16)]
+                 mydf_test  = mydf_readd5.iloc[int(mydf_readd5.shape[0]*15/16):]
+                 # print(mydf_train.iloc[:,54:].head())
+                 # print(mydf_test.iloc[:,54:].head())
+                 print(mydf_train.shape)
+                 
 
-           mydf_train = mydf_readd5.iloc[: int(mydf_readd5.shape[0]*15/16)]
-           mydf_test  = mydf_readd5.iloc[int(mydf_readd5.shape[0]*15/16):]
-           # print(mydf_train.iloc[:,54:].head())
-           # print(mydf_test.iloc[:,54:].head())
-           print(mydf_train.shape)
-           
-
-           # ****** train dataset
-           train_data_np = mydf_train.iloc[:,4:].replace(np.nan, 0.0).values
-           train_data_tensor = torch.from_numpy(train_data_np).double()
-           if train_target == 'phi':
-               train_labels_np = mydf_train.mcPhi.values.reshape((mydf_train.shape[0],1))
-           elif train_target == 'theta':
-               train_labels_np = mydf_train.mcTheta.values.reshape((mydf_train.shape[0],1))
-           else:
-               print("Wrong train target!")
-           
-           train_labels_tensor = torch.from_numpy(train_labels_np).double()
-           train_dataset   = Data.TensorDataset(train_data_tensor, train_labels_tensor)
-           train_loader = Data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
-           
-           # ****** test dataset	
-           test_data_np = mydf_test.iloc[:,4:].replace(np.nan, 0.0).values
-           test_data_tensor = torch.from_numpy(test_data_np).double()
-           
-           if train_target == 'phi':
-               test_labels_np = mydf_test.mcPhi.values.reshape((mydf_test.shape[0],1))
-               test_rec_np = mydf_test.phi.values.reshape((mydf_test.shape[0],1))	
-           elif train_target == 'theta':
-               test_labels_np = mydf_test.mcTheta.values.reshape((mydf_test.shape[0],1))
-               test_rec_np = mydf_test.theta.values.reshape((mydf_test.shape[0],1))	
-           else:
-               print("Wrong train target!")
-           
-           test_labels_tensor = torch.from_numpy(test_labels_np).double()
-           test_rec_tensor = torch.from_numpy(test_rec_np).double()	
-           test_dataset   = Data.TensorDataset(test_data_tensor, test_labels_tensor)
-           test_loader   = Data.DataLoader(test_dataset, batch_size=BATCH_SIZE_test )
-           
-           del mydf_readd5
-           print("Let's use", torch.cuda.device_count(), "GPUs!")
-           
-           net = Net(n_feature=75,  n_output=1)
-           # pklfile6 = 'train6/NN_train_params_3975284924_2.pkl'	    
-           # net.load_state_dict(torch.load(pklfile6))
-           net.cuda()
-           net = net.double()
-           print(net)
-           logger = Logger('./NN_logs_' + h5key)
-           	
-           # optimizer = torch.optim.SGD(net.parameters(), lr=LR, weight_decay=0.01,momentum=0.9)
-           # optimizer = torch.optim.SGD(net.parameters(), lr=LR, momentum=0.5)
-           # optimizer = torch.optim.Adagrad(net.parameters(), lr=LR, lr_decay=0.01)
-           optimizer = torch.optim.Adam(net.parameters(), lr=LR)
-           # optimizer = torch.optim.RMSprop(net.parameters(), lr=LR, weight_decay=5e-2)
-           loss_func = nn.MSELoss()
-           
-           plt.ion()
-           plt.figure(figsize=(10,3))	
-           loss_list = []
-           loss_list_test = []
-           # par_np = net.parameters()
-           
-           Step = 0 
-           lri = LR
-           for step, data in enumerate(train_loader):
-               b_X, b_Y = data
-               b_x = b_X.cuda()
-               b_y = b_Y.cuda()	       
-               # b_x, b_y = data
-           
-             
-               # ****** L2 regularization        
-               reg_lambda = torch.tensor(0.2)
-               l2_reg = torch.tensor(0.)
-               for param in net.parameters(): 
-                   l2_reg += param.cpu().float().norm(2)
-               
-               prediction = net(b_x).cuda()
-               loss = loss_func(prediction, b_y)
-               # loss +=  (reg_lambda*l2_reg).cuda().double()
-               optimizer.zero_grad()
-               loss.backward()
-               optimizer.step()
-               Step+=1      
-
-               if (Step+1) % 100 == 0:
-                   lri = lri/(1 + 0.005)
-                   print("lri:  ",lri)
-                   for param_group in optimizer.param_groups:
-                       param_group['lr'] = lri
-                   test_output = net(test_data_tensor.cuda())
-                   test_pred_y = test_output.cpu().data.numpy()
-                   # test_pred_y = test_output.data.numpy()
-                   accuracy_test = sum(test_pred_y - test_labels_np)
-                   loss_test = loss_func(test_output, test_labels_tensor.cuda())
-                   # loss_rec = loss_func(test_rec_tensor.cuda(), test_labels_tensor.cuda())
-                   print('Epoch:', epoch, '|step:', Step,
-                         '|train loss:%.8f'%loss.data[0], '|test loss:%.8f'%loss_test.data[0])
-                   loss_list.append(loss.data[0])
-                   loss_list_test.append(loss_test.data[0])
+                 # ****** train dataset
+                 train_data_np = mydf_train.iloc[:,4:].replace(np.nan, 0.0).values
+                 train_data_tensor = torch.from_numpy(train_data_np).double()
+                 if train_target == 'phi':
+                     train_labels_np = mydf_train.mcPhi.values.reshape((mydf_train.shape[0],1))
+                 elif train_target == 'theta':
+                     train_labels_np = mydf_train.mcTheta.values.reshape((mydf_train.shape[0],1))
+                 else:
+                     print("Wrong train target!")
+                 
+                 train_labels_tensor = torch.from_numpy(train_labels_np).double()
+                 train_dataset   = Data.TensorDataset(train_data_tensor, train_labels_tensor)
+                 train_loader = Data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
+                 
+                 # ****** test dataset	
+                 test_data_np = mydf_test.iloc[:,4:].replace(np.nan, 0.0).values
+                 test_data_tensor = torch.from_numpy(test_data_np).double()
+                 
+                 if train_target == 'phi':
+                     test_labels_np = mydf_test.mcPhi.values.reshape((mydf_test.shape[0],1))
+                     test_rec_np = mydf_test.phi.values.reshape((mydf_test.shape[0],1))	
+                 elif train_target == 'theta':
+                     test_labels_np = mydf_test.mcTheta.values.reshape((mydf_test.shape[0],1))
+                     test_rec_np = mydf_test.theta.values.reshape((mydf_test.shape[0],1))	
+                 else:
+                     print("Wrong train target!")
+                 
+                 test_labels_tensor = torch.from_numpy(test_labels_np).double()
+                 test_rec_tensor = torch.from_numpy(test_rec_np).double()	
+                 test_dataset   = Data.TensorDataset(test_data_tensor, test_labels_tensor)
+                 test_loader   = Data.DataLoader(test_dataset, batch_size=BATCH_SIZE_test )
+                 
+                 del mydf_readd5
+                 print("Let's use", torch.cuda.device_count(), "GPUs!")
+                 
+                 net = Net(n_feature=75,  n_output=1)
+                 # pklfile6 = 'train6/NN_train_params_3975284924_2.pkl'	    
+                 # net.load_state_dict(torch.load(pklfile6))
+                 net.cuda()
+                 net = net.double()
+                 print(net)
+                 logger = Logger('./NN_logs_' + h5key)
+                 	
+                 # optimizer = torch.optim.SGD(net.parameters(), lr=LR, weight_decay=0.01,momentum=0.9)
+                 # optimizer = torch.optim.SGD(net.parameters(), lr=LR, momentum=0.5)
+                 # optimizer = torch.optim.Adagrad(net.parameters(), lr=LR, lr_decay=0.01)
+                 optimizer = torch.optim.Adam(net.parameters(), lr=LR)
+                 # optimizer = torch.optim.RMSprop(net.parameters(), lr=LR, weight_decay=5e-2)
+                 loss_func = nn.MSELoss()
+                 
+                 plt.ion()
+                 plt.figure(figsize=(10,3))	
+                 loss_list = []
+                 loss_list_test = []
+                 # par_np = net.parameters()
+                 
+                 Step = 0 
+                 lri = LR
+                 for step, data in enumerate(train_loader):
+                     b_X, b_Y = data
+                     b_x = b_X.cuda()
+                     b_y = b_Y.cuda()	       
+                     # b_x, b_y = data
+                 
                    
-                   plt.subplot(131)
-                   plt.cla()
-                   plt.plot(loss_list, 'b-', lw=1, label='train')
-                   plt.plot(loss_list_test, 'r-', lw=3, label='test')
-                   plt.xlabel('step')
-                   plt.ylabel('loss')
-                   plt.text(10, 0.027, 'Loss_train=%.8f' % loss.data[0], fontdict={'size': 10, 'color':  'blue'})
-                   plt.text(10, 0.025, 'Loss_test=%.8f' % loss_test.data[0], fontdict={'size': 10, 'color':  'red'})
-                   # plt.text(10, 0.023, 'Loss_rec=%.8f' % loss_rec.data[0], fontdict={'size': 10, 'color':  'red'})
-                   legend = plt.legend(loc="best")#(loc="best")
-                   frame = legend.get_frame()
-                   frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
-
-                   if train_target == 'phi':
-                       Range = [-3.2, 3.2]
-                   elif train_target == 'theta':
-                       Range = [0.4, 2.4]
-
-                   plt.subplot(133)
-                   plt.cla() 
-                   plt.hist(test_labels_np, bins=200,range=Range, color='red',alpha=0.7, fill=False,histtype='step', label='test_truth') 
-                   plt.hist(test_pred_y,    bins=200,range=Range, color='blue',alpha=0.7, fill=False,histtype='step', label='test_pre') 
-                   plt.hist(test_rec_np,    bins=200,range=Range, color='green',alpha=0.7, fill=False,histtype='step', label='test_rec') 
-                   plt.xlabel(r'$' + '\\'+ train_target + '$')
-                   legend = plt.legend(loc="best")#(loc="best")
-                   frame = legend.get_frame()
-                   frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
-                   
-                   plt.subplot(132)
-                   plt.cla() 
-                   plt.hist(b_y.cpu().data.numpy(),        bins=200,range=Range, color='red',alpha=0.7, fill=False,histtype='step', label='train_truth') 
-                   plt.hist(prediction.cpu().data.numpy(), bins=200,range=Range, color='blue',alpha=0.7, fill=False,histtype='step', label='train_pre') 
-                   plt.xlabel(r'$' + '\\'+ train_target + '$')
-                   legend = plt.legend(loc="best")#(loc="best")
-                   frame = legend.get_frame()
-                   frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
-                   plt.pause(0.1)
+                     # ****** L2 regularization        
+                     reg_lambda = torch.tensor(0.2)
+                     l2_reg = torch.tensor(0.)
+                     for param in net.parameters(): 
+                         l2_reg += param.cpu().float().norm(2)
                      
-                   # ================================================================== #
-                   #                        Tensorboard Logging                         #
-                   # ================================================================== #
+                     prediction = net(b_x).cuda()
+                     loss = loss_func(prediction, b_y)
+                     # loss +=  (reg_lambda*l2_reg).cuda().double()
+                     optimizer.zero_grad()
+                     loss.backward()
+                     optimizer.step()
+                     Step+=1      
 
-                   # 1. Log scalar values (scalar summary)
-                   info = { 'loss': loss.item(), 'accuracy': accuracy_test.item() }
-                   
-                   for tag, value in info.items():
-                       logger.scalar_summary(tag, value, Step+1)
-                   
-                   # 2. Log values and gradients of the parameters (histogram summary)
-                   for tag, value in net.named_parameters():
-                       tag = tag.replace('.', '/')
-                       logger.histo_summary(tag, value.data.cpu().numpy(), Step+1)
-                       logger.histo_summary(tag+'/grad', value.grad.data.cpu().numpy(), Step+1)
-                   
-                   # 3. Log training images (image summary)
-                   info = { 'images': b_x.view(-1, 5, 5)[:10].cpu().numpy() }
-                   
-                   for tag, images in info.items():
-                       logger.image_summary(tag, images, Step+1)
+                     if (Step+1) % 100 == 0:
+                         lri = lri/(1 + 0.005)
+                         print("lri:  ",lri)
+                         for param_group in optimizer.param_groups:
+                             param_group['lr'] = lri
+                         test_output = net(test_data_tensor.cuda())
+                         test_pred_y = test_output.cpu().data.numpy()
+                         # test_pred_y = test_output.data.numpy()
+                         accuracy_test = sum(test_pred_y - test_labels_np)
+                         loss_test = loss_func(test_output, test_labels_tensor.cuda())
+                         # loss_rec = loss_func(test_rec_tensor.cuda(), test_labels_tensor.cuda())
+                         print('Epoch:', epoch, '|step:', Step,
+                               '|train loss:%.8f'%loss.data[0], '|test loss:%.8f'%loss_test.data[0])
+                         loss_list.append(loss.data[0])
+                         loss_list_test.append(loss_test.data[0])
+                         
+                         plt.subplot(131)
+                         plt.cla()
+                         plt.plot(loss_list, 'b-', lw=1, label='train')
+                         plt.plot(loss_list_test, 'r-', lw=3, label='test')
+                         plt.xlabel('step')
+                         plt.ylabel('loss')
+                         plt.text(10, 0.027, 'Loss_train=%.8f' % loss.data[0], fontdict={'size': 10, 'color':  'blue'})
+                         plt.text(10, 0.025, 'Loss_test=%.8f' % loss_test.data[0], fontdict={'size': 10, 'color':  'red'})
+                         # plt.text(10, 0.023, 'Loss_rec=%.8f' % loss_rec.data[0], fontdict={'size': 10, 'color':  'red'})
+                         legend = plt.legend(loc="best")#(loc="best")
+                         frame = legend.get_frame()
+                         frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
+
+                         if train_target == 'phi':
+                             Range = [-3.2, 3.2]
+                         elif train_target == 'theta':
+                             Range = [0.4, 2.4]
+
+                         plt.subplot(133)
+                         plt.cla() 
+                         plt.hist(test_labels_np, bins=200,range=Range, color='red',alpha=0.7, fill=False,histtype='step', label='test_truth') 
+                         plt.hist(test_pred_y,    bins=200,range=Range, color='blue',alpha=0.7, fill=False,histtype='step', label='test_pre') 
+                         plt.hist(test_rec_np,    bins=200,range=Range, color='green',alpha=0.7, fill=False,histtype='step', label='test_rec') 
+                         plt.xlabel(r'$' + '\\'+ train_target + '$')
+                         legend = plt.legend(loc="best")#(loc="best")
+                         frame = legend.get_frame()
+                         frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
+                         
+                         plt.subplot(132)
+                         plt.cla() 
+                         plt.hist(b_y.cpu().data.numpy(),        bins=200,range=Range, color='red',alpha=0.7, fill=False,histtype='step', label='train_truth') 
+                         plt.hist(prediction.cpu().data.numpy(), bins=200,range=Range, color='blue',alpha=0.7, fill=False,histtype='step', label='train_pre') 
+                         plt.xlabel(r'$' + '\\'+ train_target + '$')
+                         legend = plt.legend(loc="best")#(loc="best")
+                         frame = legend.get_frame()
+                         frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
+                         plt.pause(0.1)
+                           
+                         # ================================================================== #
+                         #                        Tensorboard Logging                         #
+                         # ================================================================== #
+
+                         # 1. Log scalar values (scalar summary)
+                         info = { 'loss': loss.item(), 'accuracy': accuracy_test.item() }
+                         
+                         for tag, value in info.items():
+                             logger.scalar_summary(tag, value, Step+1)
+                         
+                         # 2. Log values and gradients of the parameters (histogram summary)
+                         for tag, value in net.named_parameters():
+                             tag = tag.replace('.', '/')
+                             logger.histo_summary(tag, value.data.cpu().numpy(), Step+1)
+                             logger.histo_summary(tag+'/grad', value.grad.data.cpu().numpy(), Step+1)
+                         
+                         # 3. Log training images (image summary)
+                         info = { 'images': b_x.view(-1, 5, 5)[:10].cpu().numpy() }
+                         
+                         for tag, images in info.items():
+                             logger.image_summary(tag, images, Step+1)
 
 
         
@@ -424,16 +425,18 @@ def draw_result(trainedh5, h5key, train_target):
 	
 train_target = 'theta'
 Dir = 'train8/' + train_target + '/'  # + time.strftime( "%Y%m%d%H%M%S",time.localtime())
+
 if not os.path.isdir(Dir):
    os.mkdir(Dir)
+
 ID_train = '7151069798' #'2927360606' # '3975284924' 
-ID_test = '3975284924' #'2927360606' # '3975284924' 
+ID_test  = '3975284924' #'2927360606' # '3975284924' 
 
 trainh5file = 'B2APi0selection_' + ID_train + '_crystal_addmcMatchWeight_modified.h5'
-testh5file = 'B2APi0selection_' + ID_test + '_crystal_addmcMatchWeight_modified.h5'
+testh5file  = 'B2APi0selection_' + ID_test + '_crystal_addmcMatchWeight_modified.h5'
 
 h5key_train = 'crystal_'+ ID_train
-h5key_test = 'crystal_'+ ID_test
+h5key_test  = 'crystal_'+ ID_test
 
 trainpklfile = Dir + 'NN_train_params_' + ID_train + '.pkl'
 
@@ -445,7 +448,7 @@ trained_dist      = Dir + 'NN_train_test_' + ID_test + '_' + train_target + '.pn
 trained_dist_c    = Dir + 'NN_train_test_' + ID_test + '_' + train_target + '_crystal.png'
 trained_dist_res  = Dir + 'NN_train_test_' + ID_test + '_' + train_target + '_res.png'
 
-train(trainh5file, h5key_train, trainpklfile, trainedh5, trainedlossplot, train_target)
+train(trainh5files, h5key_trains, trainpklfile, trainedh5, trainedlossplot, train_target)
 # draw_result(trainedh5, h5key_train)
 # draw_result(testh5, h5key_test, train_target)
 # application(testh5file, testh5,  h5key_test, trainpklfile, train_target)
