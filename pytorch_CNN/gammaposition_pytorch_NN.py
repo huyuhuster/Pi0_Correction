@@ -14,6 +14,7 @@ from logger import Logger
 import os, sys
 import calculateCrystalPhiTheta
 from calculateCrystalPhiTheta import getCrystalPhiAndTheta
+from matplotlib.ticker import NullFormatter
  
 torch.manual_seed(1)
  
@@ -309,12 +310,12 @@ def application(h5file, testh5, h5key_test, pklfile, train_target):
 		pred_df.to_hdf(testh5, key=h5key_test, append = True, mode='a')
 	
 	print('end of test, begain plot....')
-	draw_result(testh5, h5key_test, train_target)
+    # draw_result(testh5, h5key_test, train_target, crystal_ID, definition)
 
 
-def draw_result(trainedh5, h5key, train_target, crystal_ID, definition):
+def draw_result(testh5, h5key, train_target, crystal_ID, definition):
         # ****** load the h5 file	
-        trained_df = pd.read_hdf(trainedh5, h5key)
+        trained_df = pd.read_hdf(testh5, h5key)
 
         Phi1, Phi2,  Phi_c, Theta1, Theta2, Theta_c = getCrystalPhiAndTheta(crystal_ID, definition)
 
@@ -348,13 +349,14 @@ def draw_result(trainedh5, h5key, train_target, crystal_ID, definition):
         # plt.style.use('ggplot')
         
         col_list = [rec_col,pre_col,mc_col]	
+        trained_df_sub = trained_df[col_list][(trained_df.mcPhi>=Phi1)&(trained_df.mcPhi<=Phi2)&(trained_df.mcTheta>=Theta1)&(trained_df.mcTheta<=Theta2)]
 
-        trained_df[col_list][(trained_df.mcPhi>=Phi1)&(trained_df.mcPhi<=Phi2)&(trained_df.mcTheta>=Theta1)&(trained_df.mcTheta<=Theta2)].plot.hist(bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step')
-        plt.plot([angle1, angle1],[0, 100], 'k--')
+        trained_df_sub.plot.hist(bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step')
+        plt.plot([angle1, angle1],[0, 50], 'k--')
         plt.text(angle1, 0, 'A', fontdict={'size': 10, 'color':  'blue'})
-        plt.plot([angle2, angle2],[0, 100], 'k--')
+        plt.plot([angle2, angle2],[0, 50], 'k--')
         plt.text(angle2, 0, 'B', fontdict={'size': 10, 'color':  'blue'})
-        plt.plot([angle_c, angle_c],[0, 100], 'k--')
+        plt.plot([angle_c, angle_c],[0, 50], 'k--')
         plt.text(angle_c, 0, 'C', fontdict={'size': 10, 'color':  'blue'})
         plt.xlabel(r'$' + '\\'+ train_target + '$')
         plt.ylabel(r'')
@@ -365,21 +367,37 @@ def draw_result(trainedh5, h5key, train_target, crystal_ID, definition):
         plt.grid(True, alpha=0.8)
         plt.savefig(trained_dist_c, dpi=300)
 
-        trained_df_sub = trained_df[col_list][(trained_df.mcPhi>=Phi1)&(trained_df.mcPhi<=Phi2)&(trained_df.mcTheta>=Theta1)&(trained_df.mcTheta<=Theta2)]
+        # definitions for the axes
+        left, width    = 0.1, 0.65
+        bottom, height = 0.1, 0.65
+        bottom_h = left_h = left + width + 0.02
+        
+        rect_scatter = [left,   bottom,   width, height]
+        rect_histx   = [left,   bottom_h, width, 0.2]
+        rect_histy   = [left_h, bottom,   0.2,   height]
+
+        	
         fig1 = plt.figure() 
-        plt.hist2d(trained_df_sub[rec_col], trained_df_sub[mc_col],(50,50), range=[Range_Cry, Range_Cry])#,cmap=plt.cm.jet)
-        plt.colorbar()
-        plt.plot([angle1, angle1],[angle2, angle2], 'k--')
-        plt.xlabel(r'$' + '\\' + train_target + '_{rec}$')
-        plt.ylabel(r'$' + '\\' + train_target + '_{Truth}$')
-        frame = legend.get_frame()
-        frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
-        plt.title('')	
-        plt.grid(True, alpha=0.8)
-        # plt.savefig(trained_dist_c, dpi=300)
+        axScatter = plt.axes(rect_scatter, xlabel=r'$'+ '\\' + train_target  + '_{rec}$ [rad]', ylabel=r'$'+ '\\' + train_target + '_{Truth}$ [rad]')
+        axHistx = plt.axes(rect_histx)
+        axHisty = plt.axes(rect_histy)
+        
+        # no labels
+        nullfmt = NullFormatter()         # no labels	
+        axHistx.xaxis.set_major_formatter(nullfmt)
+        axHisty.yaxis.set_major_formatter(nullfmt)
+        # the 2d histgram plot	
+        axScatter.hist2d(trained_df_sub[rec_col], trained_df_sub[mc_col],(50,50), range=[Range_Cry, Range_Cry],cmap=plt.cm.YlGn)
+        
+        axHistx.hist(trained_df_sub[rec_col], bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step') 	
+        axHisty.hist(trained_df_sub[mc_col], bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step', orientation='horizontal') 	
+	     
+        axHistx.set_xlim(axScatter.get_xlim())
+        axHisty.set_ylim(axScatter.get_ylim())
+        plt.savefig(trained_dist_c_RecVsMC, dpi=300)
 
         fig2 = plt.figure() 
-        plt.hist2d(trained_df_sub[pre_col],trained_df_sub[mc_col],(50,50), range = [Range_Cry, Range_Cry])#,cmap=plt.cm.jet)
+        plt.hist2d(trained_df_sub[pre_col],trained_df_sub[mc_col],(50,50), range = [Range_Cry, Range_Cry],cmap=plt.cm.YlGn)
         plt.colorbar()
         plt.plot([Phi1, Phi1],[Phi2, Phi2], 'k--')
         plt.xlabel(r'$'+ '\\' + train_target  + '_{pre}$')
@@ -388,7 +406,7 @@ def draw_result(trainedh5, h5key, train_target, crystal_ID, definition):
         frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
         plt.title('')	
         plt.grid(True, alpha=0.8)
-        # plt.savefig(trained_dist_c, dpi=300)
+        plt.savefig(trained_dist_c_PreVsMC, dpi=300)
 
         trained_df[col_list].plot.hist(bins=288, range = Range, alpha=1., linewidth=0.6, fill=False, histtype='step')
         plt.xlabel(r'$'+'\\'+ train_target + '$')
@@ -412,40 +430,66 @@ def draw_result(trainedh5, h5key, train_target, crystal_ID, definition):
         plt.ylabel(r'')
         plt.legend(loc = 'best')
         plt.grid(True, alpha=0.8)
-        plt.savefig(trained_dist_res, dpi=300)
+        plt.savefig(trained_dist_res_c, dpi=300)
         
         plt.show()
 
 
-	
-train_target = 'theta'
-Dir = 'train7/' + train_target + '/'  # + time.strftime( "%Y%m%d%H%M%S",time.localtime())
+
+energy = '1000MeV'
+Dir    = 'Energy' + energy + '/'
 if not os.path.isdir(Dir):
    os.mkdir(Dir)
-ID_train = '7151069798' #'2927360606' # '3975284924' 
-ID_test  = '3975284924' #'2927360606' # '3975284924' 
 
-trainh5file = 'B2APi0selection_' + ID_train + '_crystal_addmcMatchWeight_modified.h5'
-testh5file  = 'B2APi0selection_' + ID_test + '_crystal_addmcMatchWeight_modified.h5'
+Dir_train = Dir + 'train7' + '/'
+if not os.path.isdir(Dir_train):
+   os.mkdir(Dir_train)
+
+train_target = 'theta'
+Dir_target = Dir_train + train_target + '/'  # + time.strftime( "%Y%m%d%H%M%S",time.localtime())
+if not os.path.isdir(Dir_target):
+   os.mkdir(Dir_target)
+
+ID_train = '7151069798'   # '2927360606' # '3975284924' 
+ID_test  = '3975284924'   # '0010973571' # '3975284924' #'2927360606' # '7151069798' 
+
+Dir_test = Dir_target + 'test_' + ID_test +'/'
+if not os.path.isdir(Dir_test):
+   os.mkdir(Dir_test)
+
+threshold_train = 0.0 
+threshold       = 0.0   #0.0  #0.001  #0.0025
+
+Dir_threshold = Dir_test + 'threshold' + str(threshold) + '/'
+if not os.path.isdir(Dir_threshold):
+   os.mkdir(Dir_threshold)
+
+trainh5file = 'B2APi0selection_' + ID_train + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold_train)  + '.h5'
+testh5file  = 'B2APi0selection_' + ID_test  + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold)        + '.h5'
 
 h5key_train = 'crystal_'+ ID_train
 h5key_test  = 'crystal_'+ ID_test
 
-trainpklfile = Dir + 'NN_train_params_' + ID_train + '.pkl'
+trainpklfile = Dir_target + 'NN_train_params_' + ID_train + '.pkl'
 
-trainedh5 = Dir + 'NN_train_test_' + ID_train +'.h5'
-testh5    = Dir + 'NN_test_' + ID_test +'.h5'
+trainedh5 = Dir_target    + 'NN_train_test_' + ID_train + '.h5'
+testh5    = Dir_threshold + 'NN_test_'       + ID_test  + '.h5'
 
-trainedlossplot   = Dir + 'NN_train_test_' + ID_train + '_' + train_target + 'loss.png'
-trained_dist      = Dir + 'NN_train_test_' + ID_test + '_' + train_target + '.png'
-trained_dist_c    = Dir + 'NN_train_test_' + ID_test + '_' + train_target + '_crystal.png'
-trained_dist_res  = Dir + 'NN_train_test_' + ID_test + '_' + train_target + '_res.png'
+trainedlossplot   = Dir_target + 'NN_train_test_' + ID_train + '_' + train_target + 'loss.png'
 
-#train(trainh5file, h5key_train, trainpklfile, trainedh5, trainedlossplot, train_target)
+# train(trainh5file, h5key_train, trainpklfile, trainedh5, trainedlossplot, train_target)
 
-crystal_ID = '2626'
+crystal_ID = '2626'  #'7090' # '5218' # '2626'
 definition = '2'
+trained_dist           = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '.png'
+trained_dist_c         = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '_crystal.png'
+trained_dist_c_RecVsMC = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '_crystal_RecVsMC.png'
+trained_dist_c_PreVsMC = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '_crystal_PreVsMC.png'
+trained_dist_res       = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '_res.png'
+trained_dist_res_c     = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '_res_crystal.png'
+
 # draw_result(trainedh5, h5key_train)
 draw_result(testh5, h5key_test, train_target, crystal_ID, definition)
-# application(testh5file, testh5,  h5key_test, trainpklfile, train_target)
+
+#application(testh5file, testh5,  h5key_test, trainpklfile, train_target)
 
