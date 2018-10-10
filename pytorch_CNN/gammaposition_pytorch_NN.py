@@ -15,10 +15,12 @@ import os, sys
 import calculateCrystalPhiTheta
 from calculateCrystalPhiTheta import getCrystalPhiAndTheta
 from matplotlib.ticker import NullFormatter
+from matplotlib.colors import Colormap
+import matplotlib.colors as colors
  
 torch.manual_seed(1)
  
-EPOCH = 30
+EPOCH = 2000
 BATCH_SIZE = 8192  #32768   #8192 #32768  #16384
 BATCH_SIZE_test = 100
 LR = 0.001 #0.001
@@ -352,6 +354,7 @@ def draw_result(testh5, h5key, train_target, crystal_ID, definition):
         trained_df_sub = trained_df[col_list][(trained_df.mcPhi>=Phi1)&(trained_df.mcPhi<=Phi2)&(trained_df.mcTheta>=Theta1)&(trained_df.mcTheta<=Theta2)]
 
         trained_df_sub.plot.hist(bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step')
+        legend = plt.legend(loc="best", labels=(r'$\theta_{rec}$', r'$\theta_{NN}$', r'$\theta_{Truth}$'))#(loc="best")
         plt.plot([angle1, angle1],[0, 50], 'k--')
         plt.text(angle1, 0, 'A', fontdict={'size': 10, 'color':  'blue'})
         plt.plot([angle2, angle2],[0, 50], 'k--')
@@ -360,13 +363,13 @@ def draw_result(testh5, h5key, train_target, crystal_ID, definition):
         plt.text(angle_c, 0, 'C', fontdict={'size': 10, 'color':  'blue'})
         plt.xlabel(r'$' + '\\'+ train_target + '$')
         plt.ylabel(r'')
-        legend = plt.legend(loc="best")#(loc="best")
         frame = legend.get_frame()
         frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
         plt.title('')	
         plt.grid(True, alpha=0.8)
         plt.savefig(trained_dist_c, dpi=300)
 
+	
         # definitions for the axes
         left, width    = 0.1, 0.65
         bottom, height = 0.1, 0.65
@@ -387,31 +390,47 @@ def draw_result(testh5, h5key, train_target, crystal_ID, definition):
         axHistx.xaxis.set_major_formatter(nullfmt)
         axHisty.yaxis.set_major_formatter(nullfmt)
         # the 2d histgram plot	
-        axScatter.hist2d(trained_df_sub[rec_col], trained_df_sub[mc_col],(50,50), range=[Range_Cry, Range_Cry],cmap=plt.cm.YlGn)
+        axScatter.hist2d(trained_df_sub[rec_col], trained_df_sub[mc_col],(50,50), range=[Range_Cry, Range_Cry],cmap = 'PuBu')
+        axScatter.grid(True, alpha=0.8)
         
         axHistx.hist(trained_df_sub[rec_col], bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step') 	
         axHisty.hist(trained_df_sub[mc_col], bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step', orientation='horizontal') 	
+        axHistx.grid(True, alpha=0.8)
+        axHisty.grid(True, alpha=0.8)
 	     
         axHistx.set_xlim(axScatter.get_xlim())
         axHisty.set_ylim(axScatter.get_ylim())
         plt.savefig(trained_dist_c_RecVsMC, dpi=300)
 
+
         fig2 = plt.figure() 
-        plt.hist2d(trained_df_sub[pre_col],trained_df_sub[mc_col],(50,50), range = [Range_Cry, Range_Cry],cmap=plt.cm.YlGn)
-        plt.colorbar()
-        plt.plot([Phi1, Phi1],[Phi2, Phi2], 'k--')
-        plt.xlabel(r'$'+ '\\' + train_target  + '_{pre}$')
-        plt.ylabel(r'$'+ '\\' + train_target + '_{Truth}$')
-        frame = legend.get_frame()
-        frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
-        plt.title('')	
-        plt.grid(True, alpha=0.8)
+        axScatter = plt.axes(rect_scatter, xlabel=r'$'+ '\\' + train_target  + '_{NN}$ [rad]', ylabel=r'$'+ '\\' + train_target + '_{Truth}$ [rad]')
+        axHistx = plt.axes(rect_histx)
+        axHisty = plt.axes(rect_histy)
+        # no labels
+        nullfmt = NullFormatter()         # no labels	
+        axHistx.xaxis.set_major_formatter(nullfmt)
+        axHisty.yaxis.set_major_formatter(nullfmt)
+        # the 2d histgram plot	
+        current_cmap = plt.cm.get_cmap('PuBu')
+        current_cmap.set_bad(color='blue')
+        current_cmap.set_under(color='white', alpha=1.0)
+        axScatter.hist2d(trained_df_sub[pre_col],trained_df_sub[mc_col],(50,50), range = [Range_Cry, Range_Cry], cmap = current_cmap)
+        axScatter.grid(True, alpha=0.8)
+        
+        axHistx.hist(trained_df_sub[pre_col], bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step') 	
+        axHisty.hist(trained_df_sub[mc_col], bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step', orientation='horizontal') 	
+        axHistx.grid(True, alpha=0.8)
+        axHisty.grid(True, alpha=0.8)
+	     
+        axHistx.set_xlim(axScatter.get_xlim())
+        axHisty.set_ylim(axScatter.get_ylim())
         plt.savefig(trained_dist_c_PreVsMC, dpi=300)
 
         trained_df[col_list].plot.hist(bins=288, range = Range, alpha=1., linewidth=0.6, fill=False, histtype='step')
         plt.xlabel(r'$'+'\\'+ train_target + '$')
         plt.ylabel(r'')
-        legend = plt.legend(loc="best")#(loc="best")
+        legend = plt.legend(loc="best", labels=(r'$\theta_{rec}$', r'$\theta_{NN}$', r'$\theta_{Truth}$'))
         frame = legend.get_frame()
         frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
         plt.title('')	
@@ -421,19 +440,164 @@ def draw_result(testh5, h5key, train_target, crystal_ID, definition):
         trained_df[['res_rec', 'res_pre']].plot.hist(bins=200, range=[-0.03, 0.03], alpha=1.0, fill=False, histtype='step')
         plt.xlabel(r'$' + '\\' + train_target + '$ - $' + '\\'+ train_target +'_{truth}$')
         plt.ylabel(r'')
-        plt.legend(loc = 'best')
+        plt.legend(loc = 'best', labels=('res_rec', 'res_NN'))
         plt.grid(True, alpha=0.8)
         plt.savefig(trained_dist_res, dpi=300)
 
         trained_df[['res_rec', 'res_pre']][(trained_df.mcPhi>=Phi1)&(trained_df.mcPhi<=Phi2)&(trained_df.mcTheta>=Theta1)&(trained_df.mcTheta<=Theta2)].plot.hist(bins = 50, range=[-0.03, 0.03], alpha=1.0, fill=False, histtype='step')
         plt.xlabel(r'$' + '\\'+ train_target + '$- $'+'\\'+train_target+'_{truth}$')
         plt.ylabel(r'')
-        plt.legend(loc = 'best')
+        plt.legend(loc = 'best', labels=('res_rec', 'res_NN'))
         plt.grid(True, alpha=0.8)
         plt.savefig(trained_dist_res_c, dpi=300)
         
         plt.show()
 
+
+def draw_threshold(testh5_thresholds, h5key, train_target, crystal_ID, definition):
+        # ****** load the h5 file	
+        trained_df_0 = pd.read_hdf(testh5_thresholds[0], h5key)
+        trained_df_1 = pd.read_hdf(testh5_thresholds[1], h5key)
+        trained_df_2 = pd.read_hdf(testh5_thresholds[2], h5key)
+
+        Phi1, Phi2,  Phi_c, Theta1, Theta2, Theta_c = getCrystalPhiAndTheta(crystal_ID, definition)
+
+        if train_target == 'phi':
+            trained_df_0['res_rec'] = trained_df_0.phi    - trained_df_0.mcPhi
+            trained_df_0['res_pre'] = trained_df_0.prePhi - trained_df_0.mcPhi
+            trained_df_1['res_rec'] = trained_df_1.phi    - trained_df_1.mcPhi
+            trained_df_1['res_pre'] = trained_df_1.prePhi - trained_df_1.mcPhi
+            trained_df_2['res_rec'] = trained_df_2.phi    - trained_df_2.mcPhi
+            trained_df_2['res_pre'] = trained_df_2.prePhi - trained_df_2.mcPhi
+            mc_col  = 'mcPhi'
+            rec_col = 'phi'
+            pre_col = 'prePhi'
+            angle1 = Phi1
+            angle2 = Phi2
+            angle_c = Phi_c
+            Range_Cry = [Phi1*0.99,Phi2*1.01]
+            Range = [-3.2, 3.2]
+        elif train_target == 'theta':
+            trained_df_0['res_rec'] = trained_df_0.theta    - trained_df_0.mcTheta
+            trained_df_0['res_pre'] = trained_df_0.preTheta - trained_df_0.mcTheta
+            trained_df_1['res_rec'] = trained_df_1.theta    - trained_df_1.mcTheta
+            trained_df_1['res_pre'] = trained_df_1.preTheta - trained_df_1.mcTheta
+            trained_df_2['res_rec'] = trained_df_2.theta    - trained_df_2.mcTheta
+            trained_df_2['res_pre'] = trained_df_2.preTheta - trained_df_2.mcTheta
+            mc_col  = 'mcTheta'
+            rec_col = 'theta'
+            pre_col = 'preTheta'
+            angle1 = Theta1
+            angle2 = Theta2
+            angle_c = Theta_c
+            Range_Cry = [Theta1*0.99,Theta2*1.01]
+            Range = [0.4, 2.4]
+        else:
+            print("Wrong train target!")
+
+        print(trained_df_0[0:10])
+        
+        trained_df_sub_0 = trained_df_0[(trained_df_0.mcPhi>=Phi1)&(trained_df_0.mcPhi<=Phi2)&(trained_df_0.mcTheta>=Theta1)&(trained_df_0.mcTheta<=Theta2)]
+        trained_df_sub_1 = trained_df_1[(trained_df_1.mcPhi>=Phi1)&(trained_df_1.mcPhi<=Phi2)&(trained_df_1.mcTheta>=Theta1)&(trained_df_1.mcTheta<=Theta2)]
+        trained_df_sub_2 = trained_df_2[(trained_df_2.mcPhi>=Phi1)&(trained_df_2.mcPhi<=Phi2)&(trained_df_2.mcTheta>=Theta1)&(trained_df_2.mcTheta<=Theta2)]
+
+        plt.hist(trained_df_sub_0.res_pre, bins=50, range=[-0.03, 0.03], alpha=1.0, linewidth=1, fill=False, histtype='step', label = 'Threshold 0.0 MeV')
+        plt.hist(trained_df_sub_1.res_pre, bins=50, range=[-0.03, 0.03], alpha=1.0, linewidth=1, fill=False, histtype='step', label = 'Threshold 1.0 MeV')
+        plt.hist(trained_df_sub_2.res_pre, bins=50, range=[-0.03, 0.03], alpha=1.0, linewidth=1, fill=False, histtype='step', label = 'Threshold 2.5 MeV')
+        legend = plt.legend(loc="best")#(loc="best")
+        plt.xlabel(r'$' + '\\' + train_target + '_{NN}$ - $' + '\\'+ train_target +'_{truth}$')
+        plt.ylabel(r'')
+        frame = legend.get_frame()
+        frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
+        plt.title('')	
+        plt.grid(True, alpha=0.8)
+        plt.savefig(trained_dist_res_c_thresholds, dpi=300)
+
+        print(trained_df_sub_0[0:10])
+        plt.figure() 
+        plt.hist(trained_df_sub_0.preTheta, bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step', label = 'Threshold 0.0 MeV')
+        plt.hist(trained_df_sub_1.preTheta, bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step', label = 'Threshold 1.0 MeV')
+        plt.hist(trained_df_sub_2.preTheta, bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step', label = 'Threshold 2.5 MeV')
+        legend = plt.legend(loc="best")#(loc="best")
+        plt.xlabel(r'$' + '\\' + train_target + '_{NN}$')
+        plt.ylabel(r'')
+        frame = legend.get_frame()
+        frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
+        plt.title('')	
+        plt.grid(True, alpha=0.8)
+        plt.savefig(trained_dist_c_thresholds, dpi=300)
+
+
+        plt.show()
+
+
+def draw_phase(testh5_phases, h5key, train_target, crystal_ID, definition):
+        # ****** load the h5 file	
+        print('testh5_phases[0] :  ', testh5_phases[0])
+        trained_df_phase2 = pd.read_hdf(testh5_phases[0], h5key_phases[0])
+        trained_df_phase3 = pd.read_hdf(testh5_phases[1], h5key_phases[1])
+
+        Phi1, Phi2,  Phi_c, Theta1, Theta2, Theta_c = getCrystalPhiAndTheta(crystal_ID, definition)
+
+        if train_target == 'phi':
+            trained_df_phase2['res_rec'] = trained_df_phase2.phi    - trained_df_phase2.mcPhi
+            trained_df_phase2['res_pre'] = trained_df_phase2.prePhi - trained_df_phase2.mcPhi
+            trained_df_phase3['res_rec'] = trained_df_phase3.phi    - trained_df_phase3.mcPhi
+            trained_df_phase3['res_pre'] = trained_df_phase3.prePhi - trained_df_phase3.mcPhi
+            mc_col  = 'mcPhi'
+            rec_col = 'phi'
+            pre_col = 'prePhi'
+            angle1 = Phi1
+            angle2 = Phi2
+            angle_c = Phi_c
+            Range_Cry = [Phi1*0.99,Phi2*1.01]
+            Range = [-3.2, 3.2]
+        elif train_target == 'theta':
+            trained_df_phase2['res_rec'] = trained_df_phase2.theta    - trained_df_phase2.mcTheta
+            trained_df_phase2['res_pre'] = trained_df_phase2.preTheta - trained_df_phase2.mcTheta
+            trained_df_phase3['res_rec'] = trained_df_phase3.theta    - trained_df_phase3.mcTheta
+            trained_df_phase3['res_pre'] = trained_df_phase3.preTheta - trained_df_phase3.mcTheta
+            mc_col  = 'mcTheta'
+            rec_col = 'theta'
+            pre_col = 'preTheta'
+            angle1 = Theta1
+            angle2 = Theta2
+            angle_c = Theta_c
+            Range_Cry = [Theta1*0.99,Theta2*1.01]
+            Range = [0.4, 2.4]
+        else:
+            print("Wrong train target!")
+
+        print(trained_df_phase2[0:10])
+        
+        trained_df_sub_phase2 = trained_df_phase2[(trained_df_phase2.mcPhi>=Phi1)&(trained_df_phase2.mcPhi<=Phi2)&(trained_df_phase2.mcTheta>=Theta1)&(trained_df_phase2.mcTheta<=Theta2)]
+        trained_df_sub_phase3 = trained_df_phase3[(trained_df_phase3.mcPhi>=Phi1)&(trained_df_phase3.mcPhi<=Phi2)&(trained_df_phase3.mcTheta>=Theta1)&(trained_df_phase3.mcTheta<=Theta2)]
+        print(trained_df_sub_phase2[0:10])
+
+        plt.hist(trained_df_sub_phase2.res_pre, bins=50, range=[-0.03, 0.03], alpha=1.0, linewidth=1, fill=False, histtype='step', label = 'Phase 2', normed = 100)
+        plt.hist(trained_df_sub_phase3.res_pre, bins=50, range=[-0.03, 0.03], alpha=1.0, linewidth=1, fill=False, histtype='step', label = 'Phase 3', normed = 100)
+        legend = plt.legend(loc="best")#(loc="best")
+        plt.xlabel(r'$' + '\\' + train_target + '_{NN}$ - $' + '\\'+ train_target +'_{truth}$')
+        plt.ylabel(r'')
+        frame = legend.get_frame()
+        frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
+        plt.title('')	
+        plt.grid(True, alpha=0.8)
+        plt.savefig(trained_dist_res_c_phases, dpi=300)
+
+        plt.figure() 
+        plt.hist(trained_df_sub_phase2.preTheta, bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step', label = 'Phase 2', normed = 100)
+        plt.hist(trained_df_sub_phase3.preTheta, bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step', label = 'Phase 3', normed = 100)
+        legend = plt.legend(loc="best")#(loc="best")
+        plt.xlabel(r'$' + '\\' + train_target + '_{NN}$')
+        plt.ylabel(r'')
+        frame = legend.get_frame()
+        frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
+        plt.title('')	
+        plt.grid(True, alpha=0.8)
+        plt.savefig(trained_dist_c_phases, dpi=300)
+
+        plt.show()
 
 
 energy = '1000MeV'
@@ -451,7 +615,7 @@ if not os.path.isdir(Dir_target):
    os.mkdir(Dir_target)
 
 ID_train = '7151069798'   # '2927360606' # '3975284924' 
-ID_test  = '3975284924'   # '0010973571' # '3975284924' #'2927360606' # '7151069798' 
+ID_test  = '7245655874'   #'4908190819'   # '0010973571' # '3975284924' #'2927360606' # '7151069798' 
 
 Dir_test = Dir_target + 'test_' + ID_test +'/'
 if not os.path.isdir(Dir_test):
@@ -464,8 +628,9 @@ Dir_threshold = Dir_test + 'threshold' + str(threshold) + '/'
 if not os.path.isdir(Dir_threshold):
    os.mkdir(Dir_threshold)
 
+phase = '' # '_phase3'	
 trainh5file = 'B2APi0selection_' + ID_train + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold_train)  + '.h5'
-testh5file  = 'B2APi0selection_' + ID_test  + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold)        + '.h5'
+testh5file  = 'B2APi0selection_' + ID_test  + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold) + phase  + '.h5'
 
 h5key_train = 'crystal_'+ ID_train
 h5key_test  = 'crystal_'+ ID_test
@@ -479,7 +644,7 @@ trainedlossplot   = Dir_target + 'NN_train_test_' + ID_train + '_' + train_targe
 
 # train(trainh5file, h5key_train, trainpklfile, trainedh5, trainedlossplot, train_target)
 
-crystal_ID = '2626'  #'7090' # '5218' # '2626'
+crystal_ID = '7090'  #'7090' # '5218' # '2626'
 definition = '2'
 trained_dist           = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '.png'
 trained_dist_c         = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '_crystal.png'
@@ -487,9 +652,26 @@ trained_dist_c_RecVsMC = Dir_threshold + 'NN_test_' + ID_test + '_' + train_targ
 trained_dist_c_PreVsMC = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '_crystal_PreVsMC.png'
 trained_dist_res       = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '_res.png'
 trained_dist_res_c     = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '_res_crystal.png'
+trained_dist_res_c_thresholds  = Dir_test + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '_res_crystal_thresholds.png'
+trained_dist_c_thresholds  = Dir_test + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '_crystal_thresholds.png'
+trained_dist_res_c_phases      = Dir_test + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '_res_crystal_phases.png'
+trained_dist_c_phases      = Dir_test + 'NN_test_' + ID_test + '_' + train_target + '_' + crystal_ID + '_' + definition + '_crystal_phases.png'
 
 # draw_result(trainedh5, h5key_train)
 draw_result(testh5, h5key_test, train_target, crystal_ID, definition)
 
 #application(testh5file, testh5,  h5key_test, trainpklfile, train_target)
 
+	
+testh5_thresholds = []
+testh5_thresholds.append('/home/huyu/Pi0_correction/pytorch_CNN/Energy1000MeV/train7/theta/test_3975284924/threshold0.0/NN_test_3975284924.h5')
+testh5_thresholds.append('/home/huyu/Pi0_correction/pytorch_CNN/Energy1000MeV/train7/theta/test_3975284924/threshold0.001/NN_test_3975284924.h5')
+testh5_thresholds.append('/home/huyu/Pi0_correction/pytorch_CNN/Energy1000MeV/train7/theta/test_3975284924/threshold0.0025/NN_test_3975284924.h5')
+#draw_threshold(testh5_thresholds, h5key_test, train_target, crystal_ID, definition)
+
+	
+testh5_phases = []
+testh5_phases.append('/home/huyu/Pi0_correction/pytorch_CNN/Energy1000MeV/train7/theta/test_3975284924/threshold0.0/NN_test_3975284924.h5')
+testh5_phases.append('/home/huyu/Pi0_correction/pytorch_CNN/Energy1000MeV/train7/theta/test_4908190819/threshold0.0/NN_test_4908190819.h5')
+h5key_phases = ['crystal_3975284924', 'crystal_4908190819']
+#draw_phase(testh5_phases, h5key_phases, train_target, crystal_ID, definition)

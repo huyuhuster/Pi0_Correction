@@ -51,7 +51,7 @@ def train(h5file, h5key, pklfile, trainedh5, trainedlossplot, train_target):
 
 # input dataset from h5, then divide it into train dataset and test dataset(10:1)
 #        mydf_readd5 = pd.read_hdf(h5file, h5key, start=0, stop= 19500000)
-        reader = pd.read_hdf(h5file, h5key, chunksize=200000)
+        reader = pd.read_hdf(h5file, h5key, chunksize=BATCH_SIZE*2)
         train_dataset_list   = [] 
         test_dataset_list   = []
         for mydf_readd5 in reader:
@@ -412,7 +412,8 @@ if not os.path.isdir(Dir):
    if not os.path.isdir(Dir+ train_target + '/'):
       os.mkdir(Dir+ train_target + '/')
 ID = '7151069798' #'2927360606' # '3975284924' 
-trainh5file = 'B2APi0selection_' + ID + '_crystal_addmcMatchWeight_modified.h5'
+threshold_train = 0.0
+trainh5file = 'B2APi0selection_' + ID + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold_train)  + '.h5'
 
 h5key = 'crystal_'+ ID
 

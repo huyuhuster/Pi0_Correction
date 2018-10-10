@@ -105,13 +105,15 @@ def modified_h5(hdffile, hdffile_m, h5key, threshold):
 
 
 	
-ID = '0010973571' #  '3975284924'  #'7151069798'  #'3975284924' # '2927360606'   #'3975284924'	
+ID = '7245655874'  #'4908190819'  #'0010973571'  #'7151069798'  #'3975284924' # '2927360606'   #'3975284924'	
+phase = '' # '_pahse3'
 threshold = 0.0  #0.001 0.0025 # GeV
-csvfile = 'B2APi0selection_' + ID + '_crystal_addmcMatchWeight_phase3.csv'
-hdffile = 'B2APi0selection_' + ID + '_crystal_addmcMatchWeight_phase3.h5'
-hdffile_m = 'B2APi0selection_' + ID + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold) + '_phase3.h5'
+csvfile = 'B2APi0selection_' + ID + '_crystal_addmcMatchWeight' + phase + '.csv'
+hdffile = 'B2APi0selection_' + ID + '_crystal_addmcMatchWeight' + phase + '.h5'
+hdffile_m = 'B2APi0selection_' + ID + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold) + phase + '.h5'
 h5key = 'crystal_' + ID
+print('hdffile_m:  ', hdffile_m)
 
 #csv_h5(csvfile,hdffile, h5key)
-# read_h5(hdffile_m, h5key)
+#read_h5(hdffile_m, h5key)
 modified_h5(hdffile, hdffile_m, h5key, threshold)
