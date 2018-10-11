@@ -10,7 +10,10 @@ import numpy as np
 import tables
 import torchvision
 from torchvision import transforms
+from tensorboardX import SummaryWriter
 from logger import Logger
+import os
+import shutil
  
 torch.manual_seed(1)
  
@@ -64,7 +67,7 @@ def train(pklfile, trainedh5):
 
 # input dataset from h5, then divide it into train dataset and test dataset(10:1)
         
-        x = torch.unsqueeze(torch.linspace(-1, 1, 1000), dim=1).double()  # x data (tensor), shape=(100, 1)
+        x = torch.unsqueeze(torch.linspace(-1, 1, 10000), dim=1).double()  # x data (tensor), shape=(100, 1)
         y = torch.acos(x*0.02) + x.pow(5) - x.pow(4)*2 - x.pow(3)*2 + x.pow(2) + 0.002*torch.rand(x.size()).double()                 # noisy y data (tensor), shape=(100, 1)
         x_1 = torch.unsqueeze(torch.linspace(-1, 1, 300), dim=1).double()  # x data (tensor), shape=(100, 1)
         y_1 = torch.acos(x_1*0.02) + x_1.pow(5) - x_1.pow(4)*2 - x_1.pow(3)*2 + x_1.pow(2) + 0.002*torch.rand(x_1.size()).double()                 # noisy y data (tensor), shape=(100, 1)
@@ -84,7 +87,16 @@ def train(pklfile, trainedh5):
         net = Net(n_feature=1,  n_output=1)
         net = net.double()
         print(net)
-        logger = Logger('./NN_logs_' + h5key)
+        logdir = './NN_logs_' + h5key
+        if os.path.isdir(logdir):
+            shutil.rmtree(logdir)
+        logger = Logger(logdir)
+		
+        res = net(x_v)	
+        writer = SummaryWriter(logdir)
+        writer.add_graph(net, res)
+        writer.close()
+	
         	
 #        optimizer = torch.optim.SGD(net.parameters(), lr=LR, weight_decay=0.1)
 #        optimizer = torch.optim.SGD(net.parameters(), lr=LR)
@@ -150,6 +162,7 @@ def train(pklfile, trainedh5):
                     info = { 'loss': loss.item()}
                     
                     for tag, value in info.items():
+                        print(tag, value)
                         logger.scalar_summary(tag, value, Step+1)
                     
                     # 2. Log values and gradients of the parameters (histogram summary)
