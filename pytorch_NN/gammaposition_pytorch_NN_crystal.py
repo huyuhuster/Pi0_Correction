@@ -18,41 +18,40 @@ from calculateCrystalPhiTheta import getCrystalPhiAndTheta
 from matplotlib.ticker import NullFormatter
 from matplotlib.colors import Colormap
 import matplotlib.colors as colors
-import datetime
 
 import Draw_result
 #from Draw_result import draw_result
  
 #torch.manual_seed(1)
  
-EPOCH = 600
-BATCH_SIZE = 8192  #8192  #32768   #8192 #32768  #16384
+EPOCH = 10000
+BATCH_SIZE = 128  #8192  #32768   #8192 #32768  #16384
 BATCH_SIZE_test = 100
-LR = 0.001 #0.00001
+LR = 0.0001 #0.00001
 
 
 class Net(nn.Module):
     def __init__(self, n_feature,  n_output):
         super(Net, self).__init__()
         # ****** define the style of every layer 
-        self.hidden1 = torch.nn.Linear(n_feature, 640)   # define hiden layer, liner out put
+        self.hidden1 = torch.nn.Linear(n_feature, 64)   # define hiden layer, liner out put
         # self.drop1   = torch.nn.Dropout(0.5)
-        self.hidden2 = torch.nn.Linear(640, 400)   # define hiden layer, liner out put
-        self.hidden3 = torch.nn.Linear(400, 200)   # define hiden layer, liner out put
-        self.hidden4 = torch.nn.Linear(200, 140)   # define hiden layer, liner out put
-        self.predict = torch.nn.Linear(140, n_output)   # define output layer, liner out put
+        self.hidden2 = torch.nn.Linear(64, 40)   # define hiden layer, liner out put
+        # self.hidden3 = torch.nn.Linear(400, 200)   # define hiden layer, liner out put
+        # self.hidden4 = torch.nn.Linear(200, 140)   # define hiden layer, liner out put
+        self.predict = torch.nn.Linear(40, n_output)   # define output layer, liner out put
 
  
     def forward(self, x):
         x = self.hidden1(x)
         # x = self.drop1(x)
-        x = torch.tanh(x)  #tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
+        x = torch.relu(x)  #tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
         x = self.hidden2(x)
-        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
-        x = self.hidden3(x)
-        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
-        x = self.hidden4(x)
-        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
+        x = torch.relu(x)  #sigmoid(x) #softplus(x) #relu(x)
+        # x = self.hidden3(x)
+        # x = torch.relu(x)  #sigmoid(x) #softplus(x) #relu(x)
+        # x = self.hidden4(x)
+        # x = torch.relu(x)  #sigmoid(x) #softplus(x) #relu(x)
         x = self.predict(x)
         return x
  
@@ -111,7 +110,7 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
         lri = LR
 
         # ****** test dataset	
-        mydf_test = pd.read_hdf(h5file, h5key, start=0, stop= 100000)
+        mydf_test = pd.read_hdf(h5file, h5key, start=0, stop= 400)
         test_data_np = mydf_test.iloc[:,4:].replace(np.nan, 0.0).values
         test_data_tensor = torch.from_numpy(test_data_np).double()
         
@@ -138,7 +137,7 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
         for epoch in range(EPOCH):
            print('EPOCH:  ', epoch)
            loss_df_EPOCH_i = pd.DataFrame(columns =  ['step', 'train', 'test' ])
-           reader = pd.read_hdf(h5file, h5key, chunksize=BATCH_SIZE*2, start = 100000)
+           reader = pd.read_hdf(h5file, h5key, chunksize=BATCH_SIZE*2, start = 400)
            for mydf_readd5 in  reader: 	
 
               mydf_train = mydf_readd5
@@ -161,7 +160,7 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
               
               train_labels_tensor = torch.from_numpy(train_labels_np).double()
               train_dataset   = Data.TensorDataset(train_data_tensor, train_labels_tensor)
-              train_loader = Data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=6)
+              train_loader = Data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
               
               
               
@@ -186,7 +185,7 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
                   optimizer.step()
                   Step+=1      
 
-                  if (Step+1) % 300 == 0:
+                  if (Step+1) % 100 == 0:
                       test_output = net(test_data_tensor.cuda())
                       test_pred_y = test_output.cpu().data.numpy()
                       # test_pred_y = test_output.data.numpy()
@@ -265,19 +264,19 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
                       for tag, images in info.items():
                           logger.image_summary(tag, images, Step+1)
 
+           #lri = lri/(1 + 0.005)
+           # print("lri:  ",lri)
+           # for param_group in optimizer.param_groups:
+           #     param_group['lr'] = lri
            loss_df_EPOCH_i.to_hdf(train_lossh5, key=h5key+'epoch', append = True, mode='a')
            if (epoch+1) % 20 == 0:		   
               pklfile_epoch = Dir_pkl + 'NN_train_params_epoch' + str(epoch) + '.pkl'
               torch.save(net.state_dict(), pklfile_epoch)
-              lri = lri/(1 + 0.16)
-              print("lri:  ",lri)
-              for param_group in optimizer.param_groups:
-                  param_group['lr'] = lri
 
         
         plt.ioff()
         plt.savefig(trainedlossplot,dpi=300)
-        #plt.show()
+        plt.show()
 
         #loss_df = pd.DataFrame.from_dict({'step' : step_list, 'train' : loss_list_train, 'test' : loss_list_test})
         #loss_df.to_hdf(train_lossh5, key=h5key, mode='w')
@@ -319,9 +318,8 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
         
 def application(h5file, testh5, h5key_test, pklfile, train_target):
 	print(h5file)
-#	reader = pd.read_hdf(h5file, h5key_test, chunksize = BATCH_SIZE*2, start = 400)
-#	reader = pd.read_hdf(h5file, h5key_test, chunksize=100000,  start = 100000)
-	reader = pd.read_hdf(h5file, h5key_test, chunksize=100000)
+	reader = pd.read_hdf(h5file, h5key_test, chunksize = BATCH_SIZE*2, start = 400)
+#	reader = pd.read_hdf(h5file, h5key_test, chunksize=1000000,  stop = 2000000)
 	if os.path.exists(testh5):
 		print("The file",  testh5, " exist,  and deleted!")
 		os.remove(testh5)
@@ -659,17 +657,17 @@ Dir    = 'Energy' + energy + '/'
 if not os.path.isdir(Dir):
    os.mkdir(Dir)
 
-Dir_train = Dir + 'train8' + '/'
+Dir_train = Dir + 'train11' + '/'
 if not os.path.isdir(Dir_train):
    os.mkdir(Dir_train)
 
-train_target = 'theta'# 'phi' #'theta'
+train_target = 'theta'
 Dir_target = Dir_train + train_target + '/'  # + time.strftime( "%Y%m%d%H%M%S",time.localtime())
 if not os.path.isdir(Dir_target):
    os.mkdir(Dir_target)
 
 ID_train = '7151069798'  # '7151069798'   # '2927360606'   # '3975284924' 
-ID_test  = '7245655874'  # '7245655874'   # '4908190819'   # '0010973571' # '3975284924' #'2927360606' # '7151069798' 
+ID_test  = '9242450162'  # '7151069798'  # '7245655874'   # '4908190819'   # '0010973571' # '3975284924' #'2927360606' # '7151069798' 
 
 Dir_training = Dir_target + 'train_' + ID_train + '/'
 if not os.path.isdir(Dir_training):
@@ -691,14 +689,14 @@ if not os.path.isdir(Dir_threshold):
    os.mkdir(Dir_threshold)
 
 phase = '' # '_phase3'	
-trainh5file = 'B2APi0selection_' + ID_train + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold_train)  + '.h5'
-testh5file  = 'B2APi0selection_' + ID_test  + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold) + phase  + '.h5'
+trainh5file = 'B2APi0selection_' + ID_train + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold_train)  + '_c2626.h5'
+testh5file  = 'B2APi0selection_' + ID_test  + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold) + phase  + '_c2626.h5'
 
 h5key_train = 'crystal_'+ ID_train
 h5key_test  = 'crystal_'+ ID_test
 
-#trainpklfile = Dir_train + 'NN_train_params_' + ID_train + '.pkl'
-trainpklfile = Dir_pkl + 'NN_train_params_epoch999.pkl'
+#trainpklfile = Dir_target + 'NN_train_params_' + ID_train + '.pkl'
+trainpklfile = Dir_pkl + 'NN_train_params_epoch99.pkl'
 
 validationh5 = Dir_training    + 'NN_train_test_' + ID_train + '.h5'
 train_lossh5 = Dir_training    + 'NN_train_loss_' + ID_train + '.h5'
@@ -723,8 +721,8 @@ trained_dist_res_c_phases      = Dir_test + 'NN_test_' + ID_test + '_' + train_t
 trained_dist_c_phases          = Dir_test + 'NN_test_' + ID_test + '_' + train_target + '_' + ID_crystal + '_' + definition + '_crystal_phases.png'
 
 #draw_result(validationh5, h5key_train, train_target, ID_crystal, definition)
-draw_result(testh5, h5key_test, train_target, ID_crystal, definition)
-#Draw_result.draw_result(testh5, h5key_test, train_target, ID_test, ID_crystal, definition, Dir_threshold, train_lossh5, h5key_train)
+#draw_result(testh5, h5key_test, train_target, ID_crystal, definition)
+Draw_result.draw_result(testh5, h5key_test, train_target, ID_test, ID_crystal, definition, Dir_threshold, train_lossh5, h5key_train)
 
 #application(testh5file, testh5,  h5key_test, trainpklfile, train_target)
 

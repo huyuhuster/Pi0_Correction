@@ -26,7 +26,7 @@ import Draw_result
 #torch.manual_seed(1)
  
 EPOCH = 600
-BATCH_SIZE = 8192  #8192  #32768   #8192 #32768  #16384
+BATCH_SIZE = 1024  #8192  #32768   #8192 #32768  #16384
 BATCH_SIZE_test = 100
 LR = 0.001 #0.00001
 
@@ -35,24 +35,26 @@ class Net(nn.Module):
     def __init__(self, n_feature,  n_output):
         super(Net, self).__init__()
         # ****** define the style of every layer 
-        self.hidden1 = torch.nn.Linear(n_feature, 640)   # define hiden layer, liner out put
-        # self.drop1   = torch.nn.Dropout(0.5)
-        self.hidden2 = torch.nn.Linear(640, 400)   # define hiden layer, liner out put
-        self.hidden3 = torch.nn.Linear(400, 200)   # define hiden layer, liner out put
-        self.hidden4 = torch.nn.Linear(200, 140)   # define hiden layer, liner out put
-        self.predict = torch.nn.Linear(140, n_output)   # define output layer, liner out put
+        self.hidden1 = torch.nn.Linear(n_feature, 128)   # define hiden layer, liner out put
+        self.drop1   = torch.nn.Dropout(0.01)
+        self.hidden2 = torch.nn.Linear(128, 32)   # define hiden layer, liner out put
+        self.drop2   = torch.nn.Dropout(0.01)
+#        self.hidden3 = torch.nn.Linear(400, 200)   # define hiden layer, liner out put
+#       self.hidden4 = torch.nn.Linear(200, 140)   # define hiden layer, liner out put
+        self.predict = torch.nn.Linear(32, n_output)   # define output layer, liner out put
 
  
     def forward(self, x):
         x = self.hidden1(x)
-        # x = self.drop1(x)
-        x = torch.tanh(x)  #tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
+        x = self.drop1(x)
+        x = torch.relu(x)  #tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
         x = self.hidden2(x)
-        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
-        x = self.hidden3(x)
-        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
-        x = self.hidden4(x)
-        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
+        x = self.drop2(x)
+        x = torch.relu(x)  #sigmoid(x) #softplus(x) #relu(x)
+#        x = self.hidden3(x)
+#        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
+#        x = self.hidden4(x)
+#        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
         x = self.predict(x)
         return x
  
@@ -85,8 +87,8 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
         train_mode.write("BATCH_SIZE:  "+ str(BATCH_SIZE) + '\n')
         train_mode.write("Leaning rate:  "+ str(LR) + '\n')
         train_mode.write("Training data set  :  "+ h5file + '\n')
-        train_mode.write("Test data size  :  "+ "1000" + '\n')
-        train_mode.write("Additional  :  "+ "For crystal 2626." + '\n')
+        train_mode.write("Test data size  :  "+ "100000" + '\n')
+        train_mode.write("Additional  :  "+ "For 100MeV" + '\n')
         train_mode.close()		
 
         logdir = Dir_training + 'NN_logs_' + h5key
@@ -186,7 +188,7 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
                   optimizer.step()
                   Step+=1      
 
-                  if (Step+1) % 300 == 0:
+                  if (Step+1) % 100 == 0:
                       test_output = net(test_data_tensor.cuda())
                       test_pred_y = test_output.cpu().data.numpy()
                       # test_pred_y = test_output.data.numpy()
@@ -221,7 +223,8 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
                       if train_target == 'phi':
                           Range = [-3.2, 3.2]
                       elif train_target == 'theta':
-                          Range = [Theta1*0.995,  Theta2*1.005]   # [0.4, 2.4]
+                          Range = [0.4, 2.4]
+                          #Range = [Theta1*0.995,  Theta2*1.005]   # [0.4, 2.4]
 
                       plt.subplot(133)
                       plt.cla() 
@@ -269,7 +272,8 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
            if (epoch+1) % 20 == 0:		   
               pklfile_epoch = Dir_pkl + 'NN_train_params_epoch' + str(epoch) + '.pkl'
               torch.save(net.state_dict(), pklfile_epoch)
-              lri = lri/(1 + 0.16)
+           if (epoch+1) % 3 == 0:		   
+              lri = lri/(1 + 0.08)
               print("lri:  ",lri)
               for param_group in optimizer.param_groups:
                   param_group['lr'] = lri
@@ -481,7 +485,7 @@ def draw_result(testh5, h5key, train_target, ID_crystal, definition):
         axHisty.set_ylim(axScatter.get_ylim())
         plt.savefig(trained_dist_c_PreVsMC, dpi=300)
 
-        trained_df[col_list].plot.hist(bins=288, range = Range, alpha=1., linewidth=0.6, fill=False, histtype='step')
+        trained_df[col_list].plot.hist(bins=144, range = Range, alpha=1., linewidth=0.6, fill=False, histtype='step')
         plt.xlabel(r'$'+'\\'+ train_target + '$')
         plt.ylabel(r'')
         legend = plt.legend(loc="best", labels=(r'$\theta_{rec}$', r'$\theta_{NN}$', r'$\theta_{Truth}$'))
@@ -491,7 +495,7 @@ def draw_result(testh5, h5key, train_target, ID_crystal, definition):
         plt.grid(True, alpha=0.8)
         plt.savefig(trained_dist, dpi=300)
 
-        trained_df[['res_rec', 'res_pre']].plot.hist(bins=200, range=[-0.03, 0.03], alpha=1.0, fill=False, histtype='step')
+        trained_df[['res_rec', 'res_pre']].plot.hist(bins=100, range=[-0.03, 0.03], alpha=1.0, fill=False, histtype='step')
         plt.xlabel(r'$' + '\\' + train_target + '$ - $' + '\\'+ train_target +'_{truth}$')
         plt.ylabel(r'')
         plt.legend(loc = 'best', labels=('res_rec', 'res_NN'))
@@ -654,22 +658,22 @@ def draw_phase(testh5_phases, h5key, train_target, ID_crystal, definition):
         plt.show()
 
 
-energy = '1000MeV'
+energy = '100MeV'
 Dir    = 'Energy' + energy + '/'
 if not os.path.isdir(Dir):
    os.mkdir(Dir)
 
-Dir_train = Dir + 'train8' + '/'
+Dir_train = Dir + 'train2' + '/'
 if not os.path.isdir(Dir_train):
    os.mkdir(Dir_train)
 
-train_target = 'theta'# 'phi' #'theta'
+train_target = 'theta' #'phi' #'theta'
 Dir_target = Dir_train + train_target + '/'  # + time.strftime( "%Y%m%d%H%M%S",time.localtime())
 if not os.path.isdir(Dir_target):
    os.mkdir(Dir_target)
 
-ID_train = '7151069798'  # '7151069798'   # '2927360606'   # '3975284924' 
-ID_test  = '7245655874'  # '7245655874'   # '4908190819'   # '0010973571' # '3975284924' #'2927360606' # '7151069798' 
+ID_train = '0350861857'  # '7151069798'   # '2927360606'   # '3975284924' 
+ID_test  = '0350861857'  # '7245655874'   # '4908190819'   # '0010973571' # '3975284924' #'2927360606' # '7151069798' 
 
 Dir_training = Dir_target + 'train_' + ID_train + '/'
 if not os.path.isdir(Dir_training):
@@ -698,7 +702,7 @@ h5key_train = 'crystal_'+ ID_train
 h5key_test  = 'crystal_'+ ID_test
 
 #trainpklfile = Dir_train + 'NN_train_params_' + ID_train + '.pkl'
-trainpklfile = Dir_pkl + 'NN_train_params_epoch999.pkl'
+trainpklfile = Dir_pkl + 'NN_train_params_epoch39.pkl'
 
 validationh5 = Dir_training    + 'NN_train_test_' + ID_train + '.h5'
 train_lossh5 = Dir_training    + 'NN_train_loss_' + ID_train + '.h5'

@@ -2,34 +2,6 @@ import math
 from math import *
 
 
-id_theta_c = {}
-id_phi_c = {}
-id_R_c = {}
-id_theta_d = {}
-id_phi_d = {}
-
-file_pos = open("digits_position_dirction/digits_position.txt")
-line = file_pos.readline()
-line = file_pos.readline()
-while line:
-    line_list = line.rstrip('\n').split('\t')
-    id_theta_c[line_list[0]]= float(line_list[1])
-    id_phi_c[line_list[0]] = float(line_list[2])
-    id_R_c[line_list[0]] = float(line_list[6])
-    line = file_pos.readline()
-file_pos.close()
-
-file_dir = open("digits_position_dirction/digits_direction.txt")
-line = file_dir.readline()
-line = file_dir.readline()
-while line:
-    line_list = line.rstrip('\n').split('\t')
-    id_theta_d[line_list[0]] = float(line_list[1])
-    id_phi_d[line_list[0]]   = float(line_list[2])
-    line = file_dir.readline()
-file_dir.close()
-
-
 def definition1(R, Phi_c, Theta_c, Phi_d, Theta_d, L, W1, W2, Wc, S):
 	print("\n","*********  For the definition1: ","\n")
 	dphi   = Phi_d - Phi_c
@@ -139,9 +111,9 @@ def definition3(R, Phi_c, Theta_c, Phi_d, Theta_d, L, W1, W2, Wc, S):
 
 
 def definition4(R, Phi_c, Theta_c, Phi_d, Theta_d, L, W1, W2, Wc, S):
-	#print("\n", "*********  For the definition4: ", "\n")
+	print("\n", "*********  For the definition4: ", "\n")
 	# angle of trapezoid
-	dphi   = Phi_d - Phi_c
+	dphi   = Phi_d   - Phi_c
 	angle_tor = 3.1415926/2
 	angle_t1 = angle_tor-Theta_d    # Theta
 	angle_t2 = atan(L*2/(W2-W1))
@@ -158,7 +130,7 @@ def definition4(R, Phi_c, Theta_c, Phi_d, Theta_d, L, W1, W2, Wc, S):
 	R1_th = sqrt(R*R + at1*at1 - 2*R*at1*cos(3.1415926-Theta_c))
 	R2_th = sqrt(R*R + at2*at2 - 2*R*at2*cos(Theta_c))
 	
-	#print("Angle: ", angle_tor*180/3.1415, "   ", angle_t1*180/3.1415, "   ", angle_t2*180/3.1415)
+	print("Angle: ", angle_tor*180/3.1415, "   ", angle_t1*180/3.1415, "   ", angle_t2*180/3.1415)
 	
 	# R of two threthod
 	
@@ -171,14 +143,40 @@ def definition4(R, Phi_c, Theta_c, Phi_d, Theta_d, L, W1, W2, Wc, S):
 	Phi2   = Phi_c   + 0.0218175
 	
 	
-	#print("Phi1 = ", Phi1, "  Theta1 =  ", Theta1)
-	#print("Phi2 = ", Phi2, "  Theta2 =  ", Theta2)
+	print("Phi1 = ", Phi1, "  Theta1 =  ", Theta1)
+	print("Phi2 = ", Phi2, "  Theta2 =  ", Theta2)
 	return Phi1, Phi2, Theta1, Theta2
 	
 
  
 
 def getCrystalPhiAndTheta(crystal_ID, definition):
+    id_theta_c = {}
+    id_phi_c = {}
+    id_R_c = {}
+    id_theta_d = {}
+    id_phi_d = {}
+
+    file_pos = open("digits_position_dirction/digits_position.txt")
+    line = file_pos.readline()
+    line = file_pos.readline()
+    while line:
+        line_list = line.rstrip('\n').split('\t')
+        id_theta_c[line_list[0]]= float(line_list[1])
+        id_phi_c[line_list[0]] = float(line_list[2])
+        id_R_c[line_list[0]] = float(line_list[6])
+        line = file_pos.readline()
+    file_pos.close()
+
+    file_dir = open("digits_position_dirction/digits_direction.txt")
+    line = file_dir.readline()
+    line = file_dir.readline()
+    while line:
+        line_list = line.rstrip('\n').split('\t')
+        id_theta_d[line_list[0]] = float(line_list[1])
+        id_phi_d[line_list[0]]   = float(line_list[2])
+        line = file_dir.readline()
+    file_dir.close()
 
     # ****** position of crystal  
     R_c     = id_R_c[crystal_ID]*10.
@@ -199,8 +197,8 @@ def getCrystalPhiAndTheta(crystal_ID, definition):
     Wc = (W1+W2)/4
     S = 0.5*sqrt(L*L+W1*W1)
 
-    #print("Crystal ", crystal_ID, ",  has Theta = ", Theta_c, " and Phi =  ", Phi_c)
-    #print("delta Phi = ", dphi, ",  deta Theta = ", dtheta)
+    print("Crystal ", crystal_ID, ",  has Theta = ", Theta_c, " and Phi =  ", Phi_c)
+    print("delta Phi = ", dphi, ",  deta Theta = ", dtheta)
     if definition=='1':
         Phi1, Phi2, Theta1, Theta2 = definition1(R_c, Phi_c, Theta_c, Phi_d, Theta_d, L, W1, W2, Wc, S)
     elif definition=='2':
@@ -214,29 +212,4 @@ def getCrystalPhiAndTheta(crystal_ID, definition):
 
     return Phi1, Phi2, Phi_c, Theta1, Theta2, Theta_c
 
-   
-def getThetaB(df):
-	crystal_ID = str(int(df['ID_B']))
-	definition = '4'
-	Phi1, Phi2, Phi_c, Theta1, Theta2, Theta_c = getCrystalPhiAndTheta(crystal_ID, definition)
-	return Theta2
-
-def getThetaF(df):
-	crystal_ID = str(int(df['ID_F']))
-	definition = '4'
-	Phi1, Phi2, Phi_c, Theta1, Theta2, Theta_c = getCrystalPhiAndTheta(crystal_ID, definition)
-	return Theta1
-
-def getPhiU(df):
-	crystal_ID = str(int(df['ID_U']))
-	definition = '4'
-	Phi1, Phi2, Phi_c, Theta1, Theta2, Theta_c = getCrystalPhiAndTheta(crystal_ID, definition)
-	return Phi2
-
-def getPhiD(df):
-	crystal_ID = str(int(df['ID_D']))
-	definition = '4'
-	Phi1, Phi2, Phi_c, Theta1, Theta2, Theta_c = getCrystalPhiAndTheta(crystal_ID, definition)
-	return Phi1
-
-#getCrystalPhiAndTheta('2626', '3')
+#getCrystalPhiAndTheta('2338', '4')

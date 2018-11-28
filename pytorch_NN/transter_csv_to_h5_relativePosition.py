@@ -46,8 +46,6 @@ def modified_h5(hdffile, hdffile_m, h5key, threshold):
 		print('chunk: ', ichunk)
 		ichunk = ichunk + 1
         # mydf_readd5 = pd.read_hdf(hdffile, h5key, start =0, stop = 10000000)
-        # mydf_readd5 = pd.read_hdf(hdffile, h5key, start = 10000000)
-        # mydf_readd5 = pd.read_hdf(hdffile, h5key)
 		Phi1 =  1.4483643081842303 
 		Phi2 =  1.4794450818866633  
 		Theta1 =   0.8336485385269553
@@ -60,8 +58,6 @@ def modified_h5(hdffile, hdffile_m, h5key, threshold):
         # for column in mydf_readd5.columns:
         #	print(column)
 		file_pos = open("digits_position_dirction/digits_position.txt")
-        # all_lines = file_pos.readlines()
-        # for line in all_lines:
 		id_theta = {}
 		id_phi = {}
 		line = file_pos.readline()
@@ -72,23 +68,18 @@ def modified_h5(hdffile, hdffile_m, h5key, threshold):
 			id_phi[line_list[0]] = float(line_list[2])
 			line = file_pos.readline()
 
+        mydf_readd5['gamma_CScentralCellid'] 
+
         # print(id_theta)
 		index_list = ['mcPhi','mcTheta','phi','theta']
 		index_list_CSCid = []
-		index_list_CSW = []
+        #index_list_CSW = []
 		index_list_CSE = []
-		index_list_CSCTheta = []
-		index_list_CSCPhi = []
 		for i in range(25):
 			index_list_CSCid.append('CSCid_'+str(i))
-			index_list_CSW.append('CSW_'+str(i))
+			#index_list_CSW.append('CSW_'+str(i))
 			index_list_CSE.append('CSE_'+str(i))
-			index_list_CSCTheta.append('CSCTheta_'+str(i))
-			index_list_CSCPhi.append('CSCPhi_'+str(i))
-			mydf_readd5['CSCTheta_'+str(i)] = mydf_readd5['CSCid_'+str(i)].map(str).map(id_theta)
-			mydf_readd5['CSCPhi_'+str(i)] = mydf_readd5['CSCid_'+str(i)].map(str).map(id_phi)
        
-        # print(mydf_readd5[0:20][index_list_CSE])
         # ****** Set the threshold of crystal energy	
 		if threshold>0 :
 			mydf_readd5[mydf_readd5[index_list_CSE]<threshold] = 0.0
@@ -96,13 +87,9 @@ def modified_h5(hdffile, hdffile_m, h5key, threshold):
         
         # ****** Standardization 
 		mydf_readd5[index_list_CSE] = ((mydf_readd5[index_list_CSE].T - mydf_readd5[index_list_CSE].T.mean()) / mydf_readd5[index_list_CSE].T.std()).T
-		mydf_readd5[index_list_CSCTheta] = (mydf_readd5[index_list_CSCTheta] - mydf_readd5[index_list_CSCTheta].stack().mean())/ mydf_readd5[index_list_CSCTheta].stack().std()
-		mydf_readd5[index_list_CSCPhi] = (mydf_readd5[index_list_CSCPhi] - mydf_readd5[index_list_CSCPhi].stack().mean())/ mydf_readd5[index_list_CSCPhi].stack().std()
         # mydf_readd5[index_list_CSE] = ((mydf_readd5[index_list_CSE].T - mydf_readd5[index_list_CSE].T.min()) / (mydf_readd5[index_list_CSE].T.max()-mydf_readd5[index_list_CSE].T.min())).T
-        # mydf_readd5[index_list_CSCTheta] = (mydf_readd5[index_list_CSCTheta] - mydf_readd5[index_list_CSCTheta].stack().min())/ (mydf_readd5[index_list_CSCTheta].stack().max() - mydf_readd5[index_list_CSCTheta].stack().min())
-        # mydf_readd5[index_list_CSCPhi] = (mydf_readd5[index_list_CSCPhi] - mydf_readd5[index_list_CSCPhi].stack().min())/ (mydf_readd5[index_list_CSCPhi].stack().max() - mydf_readd5[index_list_CSCPhi].stack().min())
 
-		index_list = index_list +  index_list_CSE + index_list_CSCTheta + index_list_CSCPhi
+		index_list = index_list +  index_list_CSE 
         # print(index_list)
 		mydf_readd5 = mydf_readd5[index_list] 
         # print(mydf_readd5.loc[:,['CSCPhi_1','CSCid_1']])

@@ -19,16 +19,20 @@ from matplotlib.ticker import NullFormatter
 from matplotlib.colors import Colormap
 import matplotlib.colors as colors
 import datetime
+from calculateCrystalPhiTheta import getThetaB
+from calculateCrystalPhiTheta import getThetaF
+from calculateCrystalPhiTheta import getPhiU
+from calculateCrystalPhiTheta import getPhiD
 
 import Draw_result
 #from Draw_result import draw_result
  
 #torch.manual_seed(1)
  
-EPOCH = 600
-BATCH_SIZE = 8192  #8192  #32768   #8192 #32768  #16384
+EPOCH = 1000
+BATCH_SIZE = 1024  #32768   #8192 #32768  #16384
 BATCH_SIZE_test = 100
-LR = 0.001 #0.00001
+LR = 0.0001 #0.00001
 
 
 class Net(nn.Module):
@@ -38,21 +42,21 @@ class Net(nn.Module):
         self.hidden1 = torch.nn.Linear(n_feature, 640)   # define hiden layer, liner out put
         # self.drop1   = torch.nn.Dropout(0.5)
         self.hidden2 = torch.nn.Linear(640, 400)   # define hiden layer, liner out put
-        self.hidden3 = torch.nn.Linear(400, 200)   # define hiden layer, liner out put
-        self.hidden4 = torch.nn.Linear(200, 140)   # define hiden layer, liner out put
-        self.predict = torch.nn.Linear(140, n_output)   # define output layer, liner out put
+        #self.hidden3 = torch.nn.Linear(400, 200)   # define hiden layer, liner out put
+        #self.hidden4 = torch.nn.Linear(200, 140)   # define hiden layer, liner out put
+        self.predict = torch.nn.Linear(400, n_output)   # define output layer, liner out put
 
  
     def forward(self, x):
         x = self.hidden1(x)
         # x = self.drop1(x)
-        x = torch.tanh(x)  #tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
+        x = torch.relu(x)  #tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
         x = self.hidden2(x)
-        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
-        x = self.hidden3(x)
-        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
-        x = self.hidden4(x)
-        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
+        x = torch.relu(x)  #sigmoid(x) #softplus(x) #relu(x)
+        # x = self.hidden3(x)
+        # x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
+        # x = self.hidden4(x)
+        # x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
         x = self.predict(x)
         return x
  
@@ -62,7 +66,7 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
         # ******* input dataset from h5, then divide it into train dataset and test dataset(16:1)
 
         print("Let's use", torch.cuda.device_count(), "GPUs!")
-        net = Net(n_feature=75,  n_output=1)
+        net = Net(n_feature=25,  n_output=1)
         # pklfile6 = 'train6/NN_train_params_3975284924_2.pkl'	    
         # net.load_state_dict(torch.load(pklfile6))
         net.cuda()
@@ -85,8 +89,8 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
         train_mode.write("BATCH_SIZE:  "+ str(BATCH_SIZE) + '\n')
         train_mode.write("Leaning rate:  "+ str(LR) + '\n')
         train_mode.write("Training data set  :  "+ h5file + '\n')
-        train_mode.write("Test data size  :  "+ "1000" + '\n')
-        train_mode.write("Additional  :  "+ "For crystal 2626." + '\n')
+        train_mode.write("Test data size  :  "+ "100000" + '\n')
+        train_mode.write("Additional  :  "+ "For relative position." + '\n')
         train_mode.close()		
 
         logdir = Dir_training + 'NN_logs_' + h5key
@@ -112,15 +116,16 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
 
         # ****** test dataset	
         mydf_test = pd.read_hdf(h5file, h5key, start=0, stop= 100000)
-        test_data_np = mydf_test.iloc[:,4:].replace(np.nan, 0.0).values
+        test_data_np = mydf_test.iloc[:,-25:].replace(np.nan, 0.0).values
+        #print("test_data_np: ", test_data_np[0:10])
         test_data_tensor = torch.from_numpy(test_data_np).double()
         
         if train_target == 'phi':
-            test_labels_np = mydf_test.mcPhi.values.reshape((mydf_test.shape[0],1))
-            test_rec_np = mydf_test.phi.values.reshape((mydf_test.shape[0],1))	
+            test_labels_np = mydf_test.mcPhi_rel.values.reshape((mydf_test.shape[0],1))
+            test_rec_np = mydf_test.phi_rel.values.reshape((mydf_test.shape[0],1))	
         elif train_target == 'theta':
-            test_labels_np = mydf_test.mcTheta.values.reshape((mydf_test.shape[0],1))
-            test_rec_np = mydf_test.theta.values.reshape((mydf_test.shape[0],1))	
+            test_labels_np = mydf_test.mcTheta_rel.values.reshape((mydf_test.shape[0],1))
+            test_rec_np = mydf_test.theta_rel.values.reshape((mydf_test.shape[0],1))	
         else:
             print("Wrong train target!")
         
@@ -150,18 +155,19 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
               
 
               # ****** train dataset
-              train_data_np = mydf_train.iloc[:,4:].replace(np.nan, 0.0).values
+              train_data_np = mydf_train.iloc[:,-25:].replace(np.nan, 0.0).values
+              #print("train_data_np: ", train_data_np[0:10])
               train_data_tensor = torch.from_numpy(train_data_np).double()
               if train_target == 'phi':
-                  train_labels_np = mydf_train.mcPhi.values.reshape((mydf_train.shape[0],1))
+                  train_labels_np = mydf_train.mcPhi_rel.values.reshape((mydf_train.shape[0],1))
               elif train_target == 'theta':
-                  train_labels_np = mydf_train.mcTheta.values.reshape((mydf_train.shape[0],1))
+                  train_labels_np = mydf_train.mcTheta_rel.values.reshape((mydf_train.shape[0],1))
               else:
                   print("Wrong train target!")
               
               train_labels_tensor = torch.from_numpy(train_labels_np).double()
               train_dataset   = Data.TensorDataset(train_data_tensor, train_labels_tensor)
-              train_loader = Data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=6)
+              train_loader = Data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
               
               
               
@@ -186,7 +192,7 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
                   optimizer.step()
                   Step+=1      
 
-                  if (Step+1) % 300 == 0:
+                  if (Step+1) % 200 == 0:
                       test_output = net(test_data_tensor.cuda())
                       test_pred_y = test_output.cpu().data.numpy()
                       # test_pred_y = test_output.data.numpy()
@@ -219,9 +225,9 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
                       Theta1 =   0.8336485385269553
                       Theta2 =   0.8647267287924316
                       if train_target == 'phi':
-                          Range = [-3.2, 3.2]
+                          Range = [-0.15, 0.15]
                       elif train_target == 'theta':
-                          Range = [Theta1*0.995,  Theta2*1.005]   # [0.4, 2.4]
+                          Range = [-0.15, 0.15]  #[Theta1*0.995,  Theta2*1.005]   # [0.4, 2.4]
 
                       plt.subplot(133)
                       plt.cla() 
@@ -269,7 +275,7 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
            if (epoch+1) % 20 == 0:		   
               pklfile_epoch = Dir_pkl + 'NN_train_params_epoch' + str(epoch) + '.pkl'
               torch.save(net.state_dict(), pklfile_epoch)
-              lri = lri/(1 + 0.16)
+              lri = lri/(1 + 0.08)
               print("lri:  ",lri)
               for param_group in optimizer.param_groups:
                   param_group['lr'] = lri
@@ -308,45 +314,48 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
         
         # test_pred_y = np.delete(test_pred_y, 0, 0)
         print("shapes:  ", test_pred_y.shape)
-        pred_df = pd.DataFrame(mydf_test[['mcPhi','phi', 'mcTheta', 'theta']])
+        pred_df = pd.DataFrame(mydf_test[['mcPhi_rel','phi_rel', 'mcTheta_rel', 'theta_rel']])
         print("shapes:  ", test_pred_y.shape, pred_df.shape)
         if train_target == 'phi':
-           pred_df['prePhi'] = test_pred_y
+           pred_df['prePhi_rel'] = test_pred_y
         elif train_target == 'theta':
-           pred_df['preTheta'] = test_pred_y
+           pred_df['preTheta_rel'] = test_pred_y
         pred_df.to_hdf(validationh5, key=h5key, mode='w')
 
         
 def application(h5file, testh5, h5key_test, pklfile, train_target):
 	print(h5file)
 #	reader = pd.read_hdf(h5file, h5key_test, chunksize = BATCH_SIZE*2, start = 400)
-#	reader = pd.read_hdf(h5file, h5key_test, chunksize=100000,  start = 100000)
-	reader = pd.read_hdf(h5file, h5key_test, chunksize=100000)
+	reader = pd.read_hdf(h5file, h5key_test, chunksize=100000,  start = 100000)
+#	reader = pd.read_hdf(h5file, h5key_test, chunksize=100000)
 	if os.path.exists(testh5):
 		print("The file",  testh5, " exist,  and deleted!")
 		os.remove(testh5)
 	else:
 		print("The file",  testh5, "does not exist!")
 	print('Begain test....')
+	
+	file_pos = open("digits_position_dirction/digits_position.txt")
+	id_theta = {}
+	id_phi = {}
+	line = file_pos.readline()
+	line = file_pos.readline()
+	while line:
+	        line_list = line.rstrip('\n').split('\t')
+	        id_theta[line_list[0]] = float(line_list[1])
+	        id_phi[line_list[0]] = float(line_list[2])
+	        line = file_pos.readline() 
+
 	for mydf_test in reader:
 		# ****** test dataset	
-		test_data_np = mydf_test.iloc[:,4:].replace(np.nan, 0.0).values
+        #print(mydf_test.head())
+		test_data_np = mydf_test.iloc[:,-25:].replace(np.nan, 0.0).values
 
-		if train_target == 'phi':
-		    test_labels_np = mydf_test.mcPhi.values.reshape((mydf_test.shape[0],1))
-		    test_rec_np = mydf_test.phi.values.reshape((mydf_test.shape[0],1))	
-		elif train_target == 'theta':
-		    test_labels_np = mydf_test.mcTheta.values.reshape((mydf_test.shape[0],1))
-		    test_rec_np = mydf_test.theta.values.reshape((mydf_test.shape[0],1))	
-		else:
-		    print("Wrong train target!")
-		
 		test_data_tensor = torch.from_numpy(test_data_np).double()
-		test_labels_tensor = torch.from_numpy(test_labels_np).double()
 		
 	    
 	    # ****** load the model
-		net = Net(n_feature=75,  n_output=1)
+		net = Net(n_feature=25,  n_output=1)
 		pklfile9 = 'Energy1000MeV/train9/theta/train_4055541376/train_pkl_4055541376/NN_train_params_epoch1379.pkl' 
 		net.load_state_dict(torch.load(pklfile, map_location='cpu'))
 		net = net.double()
@@ -356,11 +365,31 @@ def application(h5file, testh5, h5key_test, pklfile, train_target):
 		print('test calculat successfully!')
 		test_pred_y = test_output.data.numpy()
 		
-		pred_df = pd.DataFrame(mydf_test[['mcPhi','phi', 'mcTheta', 'theta']])
+		# ****** Calculate the relative mcPhi and mcTheta
+		mydf_test['ID_B'] = mydf_test['centralID'] + 144*2
+		mydf_test['ID_F'] = mydf_test['centralID'] - 144*2
+		mydf_test['ID_U'] = mydf_test['centralID'] + 2
+		mydf_test['ID_D'] = mydf_test['centralID'] - 2
+		mydf_test['theta_central']   = mydf_test['centralID'].map(str).map(id_theta)
+		mydf_test[  'phi_central']   = mydf_test['centralID'].map(str).map(id_phi)
+		
+		mydf_test['theta_B'] = mydf_test.apply(getThetaB, axis=1)
+		mydf_test['theta_F'] = mydf_test.apply(getThetaF, axis=1)
+		mydf_test['phi_U']   = mydf_test.apply(getPhiU, axis=1)
+		mydf_test['phi_D']   = mydf_test.apply(getPhiD, axis=1)
+		
+		
+		pred_df = pd.DataFrame(mydf_test[['mcPhi_rel','phi_rel', 'mcTheta_rel', 'theta_rel','mcPhi','phi', 'mcTheta', 'theta']])
 		if train_target == 'phi':
-		   pred_df['prePhi'] = test_pred_y
+		   pred_df['prePhi_rel'] = test_pred_y
+		   pred_df['mcPhi_c'] = pred_df['mcPhi_rel']  * (mydf_test['phi_U'] - mydf_test['phi_D']) + mydf_test[ 'phi_central']
+		   pred_df['phi_c']   = pred_df['phi_rel']    * (mydf_test['phi_U'] - mydf_test['phi_D']) + mydf_test[ 'phi_central']
+		   pred_df['prePhi']  = pred_df['prePhi_rel'] * (mydf_test['phi_U'] - mydf_test['phi_D']) + mydf_test[ 'phi_central']
 		elif train_target == 'theta':
-		   pred_df['preTheta'] = test_pred_y
+		   pred_df['preTheta_rel'] = test_pred_y
+		   pred_df['mcTheta_c'] = pred_df['mcTheta_rel']  * (mydf_test['theta_B'] - mydf_test['theta_F']) + mydf_test['theta_central']
+		   pred_df['theta_c']   = pred_df['theta_rel']    * (mydf_test['theta_B'] - mydf_test['theta_F']) + mydf_test['theta_central']
+		   pred_df['preTheta']  = pred_df['preTheta_rel'] * (mydf_test['theta_B'] - mydf_test['theta_F']) + mydf_test['theta_central']
 		pred_df.to_hdf(testh5, key=h5key_test, append = True, mode='a')
 	
 	print('end of test, begain plot....')
@@ -370,14 +399,15 @@ def application(h5file, testh5, h5key_test, pklfile, train_target):
 def draw_result(testh5, h5key, train_target, ID_crystal, definition):
         # ****** load the h5 file	
         trained_df = pd.read_hdf(testh5, h5key)
+        print(trained_df.head())
 
         Phi1, Phi2,  Phi_c, Theta1, Theta2, Theta_c = getCrystalPhiAndTheta(ID_crystal, definition)
         print("Phi1:  ", Phi1, "  Phi2:  ", Phi2)
         print("Theta1:  ", Theta1, "  Theta2:  ", Theta2)
 
         if train_target == 'phi':
-            trained_df['res_rec'] = trained_df.phi-trained_df.mcPhi
-            trained_df['res_pre'] = trained_df.prePhi-trained_df.mcPhi
+            trained_df['res_rec'] = trained_df.phi-trained_df.mcPhi_rel
+            trained_df['res_pre'] = trained_df.prePhi-trained_df.mcPhi_rel
             mc_col  = 'mcPhi'
             rec_col = 'phi'
             pre_col = 'prePhi'
@@ -491,14 +521,14 @@ def draw_result(testh5, h5key, train_target, ID_crystal, definition):
         plt.grid(True, alpha=0.8)
         plt.savefig(trained_dist, dpi=300)
 
-        trained_df[['res_rec', 'res_pre']].plot.hist(bins=200, range=[-0.03, 0.03], alpha=1.0, fill=False, histtype='step')
+        trained_df[['res_rec', 'res_pre']].plot.hist(bins=200, range=[-0.06, 0.06], alpha=1.0, fill=False, histtype='step')
         plt.xlabel(r'$' + '\\' + train_target + '$ - $' + '\\'+ train_target +'_{truth}$')
         plt.ylabel(r'')
         plt.legend(loc = 'best', labels=('res_rec', 'res_NN'))
         plt.grid(True, alpha=0.8)
         plt.savefig(trained_dist_res, dpi=300)
 
-        trained_df[['res_rec', 'res_pre']][(trained_df.mcPhi>=Phi1)&(trained_df.mcPhi<=Phi2)&(trained_df.mcTheta>=Theta1)&(trained_df.mcTheta<=Theta2)].plot.hist(bins = 50, range=[-0.03, 0.03], alpha=1.0, fill=False, histtype='step')
+        trained_df[['res_rec', 'res_pre']][(trained_df.mcPhi>=Phi1)&(trained_df.mcPhi<=Phi2)&(trained_df.mcTheta>=Theta1)&(trained_df.mcTheta<=Theta2)].plot.hist(bins = 50, range=[-0.06, 0.06], alpha=1.0, fill=False, histtype='step')
         plt.xlabel(r'$' + '\\'+ train_target + '$- $'+'\\'+train_target+'_{truth}$')
         plt.ylabel(r'')
         plt.legend(loc = 'best', labels=('res_rec', 'res_NN'))
@@ -659,16 +689,16 @@ Dir    = 'Energy' + energy + '/'
 if not os.path.isdir(Dir):
    os.mkdir(Dir)
 
-Dir_train = Dir + 'train8' + '/'
+Dir_train = Dir + 'train1_rel' + '/'
 if not os.path.isdir(Dir_train):
    os.mkdir(Dir_train)
 
-train_target = 'theta'# 'phi' #'theta'
+train_target = 'phi' #'phi' #'theta'
 Dir_target = Dir_train + train_target + '/'  # + time.strftime( "%Y%m%d%H%M%S",time.localtime())
 if not os.path.isdir(Dir_target):
    os.mkdir(Dir_target)
 
-ID_train = '7151069798'  # '7151069798'   # '2927360606'   # '3975284924' 
+ID_train = '7245655874'  # '7151069798'   # '2927360606'   # '3975284924' 
 ID_test  = '7245655874'  # '7245655874'   # '4908190819'   # '0010973571' # '3975284924' #'2927360606' # '7151069798' 
 
 Dir_training = Dir_target + 'train_' + ID_train + '/'
@@ -691,14 +721,14 @@ if not os.path.isdir(Dir_threshold):
    os.mkdir(Dir_threshold)
 
 phase = '' # '_phase3'	
-trainh5file = 'B2APi0selection_' + ID_train + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold_train)  + '.h5'
-testh5file  = 'B2APi0selection_' + ID_test  + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold) + phase  + '.h5'
+trainh5file = 'B2APi0selection_' + ID_train + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold_train)  + '_rel.h5'
+testh5file  = 'B2APi0selection_' + ID_test  + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold) + phase  + '_rel.h5'
 
 h5key_train = 'crystal_'+ ID_train
 h5key_test  = 'crystal_'+ ID_test
 
 #trainpklfile = Dir_train + 'NN_train_params_' + ID_train + '.pkl'
-trainpklfile = Dir_pkl + 'NN_train_params_epoch999.pkl'
+trainpklfile = Dir_pkl + 'NN_train_params_epoch59.pkl'
 
 validationh5 = Dir_training    + 'NN_train_test_' + ID_train + '.h5'
 train_lossh5 = Dir_training    + 'NN_train_loss_' + ID_train + '.h5'
@@ -707,7 +737,7 @@ testh5       = Dir_threshold   + 'NN_test_'       + ID_test  + '.h5'
 
 trainedlossplot   = Dir_training + 'NN_train_test_' + ID_train + '_' + train_target + 'loss.png'
 
-#train(trainh5file, h5key_train, trainpklfile, validationh5, trainedlossplot, train_target, train_lossh5)
+train(trainh5file, h5key_train, trainpklfile, validationh5, trainedlossplot, train_target, train_lossh5)
 
 ID_crystal = '2626'  #'7090' # '5218' # '2626'
 definition = '2'
@@ -723,7 +753,7 @@ trained_dist_res_c_phases      = Dir_test + 'NN_test_' + ID_test + '_' + train_t
 trained_dist_c_phases          = Dir_test + 'NN_test_' + ID_test + '_' + train_target + '_' + ID_crystal + '_' + definition + '_crystal_phases.png'
 
 #draw_result(validationh5, h5key_train, train_target, ID_crystal, definition)
-draw_result(testh5, h5key_test, train_target, ID_crystal, definition)
+#draw_result(testh5, h5key_test, train_target, ID_crystal, definition)
 #Draw_result.draw_result(testh5, h5key_test, train_target, ID_test, ID_crystal, definition, Dir_threshold, train_lossh5, h5key_train)
 
 #application(testh5file, testh5,  h5key_test, trainpklfile, train_target)

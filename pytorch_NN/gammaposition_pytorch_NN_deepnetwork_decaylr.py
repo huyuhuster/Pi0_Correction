@@ -18,15 +18,14 @@ from calculateCrystalPhiTheta import getCrystalPhiAndTheta
 from matplotlib.ticker import NullFormatter
 from matplotlib.colors import Colormap
 import matplotlib.colors as colors
-import datetime
 
 import Draw_result
-#from Draw_result import draw_result
+from Draw_result import draw_result
  
 #torch.manual_seed(1)
  
-EPOCH = 600
-BATCH_SIZE = 8192  #8192  #32768   #8192 #32768  #16384
+EPOCH = 10000
+BATCH_SIZE = 128  #8192  #32768   #8192 #32768  #16384
 BATCH_SIZE_test = 100
 LR = 0.001 #0.00001
 
@@ -35,24 +34,30 @@ class Net(nn.Module):
     def __init__(self, n_feature,  n_output):
         super(Net, self).__init__()
         # ****** define the style of every layer 
-        self.hidden1 = torch.nn.Linear(n_feature, 640)   # define hiden layer, liner out put
+        self.hidden1 = torch.nn.Linear(n_feature, 128)   # define hiden layer, liner out put
         # self.drop1   = torch.nn.Dropout(0.5)
-        self.hidden2 = torch.nn.Linear(640, 400)   # define hiden layer, liner out put
-        self.hidden3 = torch.nn.Linear(400, 200)   # define hiden layer, liner out put
-        self.hidden4 = torch.nn.Linear(200, 140)   # define hiden layer, liner out put
-        self.predict = torch.nn.Linear(140, n_output)   # define output layer, liner out put
+        self.hidden2 = torch.nn.Linear(128, 64)   # define hiden layer, liner out put
+        self.hidden3 = torch.nn.Linear(64, 32)   # define hiden layer, liner out put
+        self.hidden4 = torch.nn.Linear(32, 16)   # define hiden layer, liner out put
+        self.hidden5 = torch.nn.Linear(16, 8)   # define hiden layer, liner out put
+        self.hidden6 = torch.nn.Linear(8, 4)   # define hiden layer, liner out put
+        self.predict = torch.nn.Linear(4, n_output)   # define output layer, liner out put
 
  
     def forward(self, x):
         x = self.hidden1(x)
         # x = self.drop1(x)
-        x = torch.tanh(x)  #tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
+        x = torch.relu(x)  #tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
         x = self.hidden2(x)
-        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
+        x = torch.relu(x)  #sigmoid(x) #softplus(x) #relu(x)
         x = self.hidden3(x)
-        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
+        x = torch.relu(x)  #sigmoid(x) #softplus(x) #relu(x)
         x = self.hidden4(x)
-        x = torch.tanh(x)  #sigmoid(x) #softplus(x) #relu(x)
+        x = torch.relu(x)  #sigmoid(x) #softplus(x) #relu(x)
+        x = self.hidden5(x)
+        x = torch.relu(x)  #sigmoid(x) #softplus(x) #relu(x)
+        x = self.hidden6(x)
+        x = torch.relu(x)  #sigmoid(x) #softplus(x) #relu(x)
         x = self.predict(x)
         return x
  
@@ -86,7 +91,7 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
         train_mode.write("Leaning rate:  "+ str(LR) + '\n')
         train_mode.write("Training data set  :  "+ h5file + '\n')
         train_mode.write("Test data size  :  "+ "1000" + '\n')
-        train_mode.write("Additional  :  "+ "For crystal 2626." + '\n')
+        train_mode.write("Additional  :  "+ "For crystal 2626. And deeper network." + '\n')
         train_mode.close()		
 
         logdir = Dir_training + 'NN_logs_' + h5key
@@ -111,7 +116,7 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
         lri = LR
 
         # ****** test dataset	
-        mydf_test = pd.read_hdf(h5file, h5key, start=0, stop= 100000)
+        mydf_test = pd.read_hdf(h5file, h5key, start=0, stop= 400)
         test_data_np = mydf_test.iloc[:,4:].replace(np.nan, 0.0).values
         test_data_tensor = torch.from_numpy(test_data_np).double()
         
@@ -138,7 +143,7 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
         for epoch in range(EPOCH):
            print('EPOCH:  ', epoch)
            loss_df_EPOCH_i = pd.DataFrame(columns =  ['step', 'train', 'test' ])
-           reader = pd.read_hdf(h5file, h5key, chunksize=BATCH_SIZE*2, start = 100000)
+           reader = pd.read_hdf(h5file, h5key, chunksize=BATCH_SIZE*2, start = 400)
            for mydf_readd5 in  reader: 	
 
               mydf_train = mydf_readd5
@@ -161,7 +166,7 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
               
               train_labels_tensor = torch.from_numpy(train_labels_np).double()
               train_dataset   = Data.TensorDataset(train_data_tensor, train_labels_tensor)
-              train_loader = Data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=6)
+              train_loader = Data.DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=8)
               
               
               
@@ -186,7 +191,7 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
                   optimizer.step()
                   Step+=1      
 
-                  if (Step+1) % 300 == 0:
+                  if (Step+1) % 100 == 0:
                       test_output = net(test_data_tensor.cuda())
                       test_pred_y = test_output.cpu().data.numpy()
                       # test_pred_y = test_output.data.numpy()
@@ -266,18 +271,26 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
                           logger.image_summary(tag, images, Step+1)
 
            loss_df_EPOCH_i.to_hdf(train_lossh5, key=h5key+'epoch', append = True, mode='a')
-           if (epoch+1) % 20 == 0:		   
+           if (epoch+1) % 50 == 0:		   
               pklfile_epoch = Dir_pkl + 'NN_train_params_epoch' + str(epoch) + '.pkl'
               torch.save(net.state_dict(), pklfile_epoch)
-              lri = lri/(1 + 0.16)
+
+              # decay learning rate
+              lri = lri/(1 + 0.035)
               print("lri:  ",lri)
+              print("Before decay lr:   ")			  
+              for param_group in optimizer.param_groups:
+                  print(param_group['lr'])
               for param_group in optimizer.param_groups:
                   param_group['lr'] = lri
+              print("After decay lr:   ")			  
+              for param_group in optimizer.param_groups:
+                  print(param_group['lr'])
 
         
         plt.ioff()
         plt.savefig(trainedlossplot,dpi=300)
-        #plt.show()
+        plt.show()
 
         #loss_df = pd.DataFrame.from_dict({'step' : step_list, 'train' : loss_list_train, 'test' : loss_list_test})
         #loss_df.to_hdf(train_lossh5, key=h5key, mode='w')
@@ -319,9 +332,8 @@ def train(h5file, h5key, pklfile, validationh5, trainedlossplot, train_target, t
         
 def application(h5file, testh5, h5key_test, pklfile, train_target):
 	print(h5file)
-#	reader = pd.read_hdf(h5file, h5key_test, chunksize = BATCH_SIZE*2, start = 400)
-#	reader = pd.read_hdf(h5file, h5key_test, chunksize=100000,  start = 100000)
-	reader = pd.read_hdf(h5file, h5key_test, chunksize=100000)
+	reader = pd.read_hdf(h5file, h5key_test, chunksize=BATCH_SIZE*2, start = 400)
+#	reader = pd.read_hdf(h5file, h5key_test, chunksize=1000000,  stop = 2000000)
 	if os.path.exists(testh5):
 		print("The file",  testh5, " exist,  and deleted!")
 		os.remove(testh5)
@@ -347,7 +359,7 @@ def application(h5file, testh5, h5key_test, pklfile, train_target):
 	    
 	    # ****** load the model
 		net = Net(n_feature=75,  n_output=1)
-		pklfile9 = 'Energy1000MeV/train9/theta/train_4055541376/train_pkl_4055541376/NN_train_params_epoch1379.pkl' 
+        # pklfile9 = 'Energy1000MeV/train9/theta/train_4055541376/train_pkl_4055541376/NN_train_params_epoch1379.pkl' 
 		net.load_state_dict(torch.load(pklfile, map_location='cpu'))
 		net = net.double()
 		
@@ -366,146 +378,6 @@ def application(h5file, testh5, h5key_test, pklfile, train_target):
 	print('end of test, begain plot....')
     # draw_result(testh5, h5key_test, train_target, ID_crystal, definition)
 
-
-def draw_result(testh5, h5key, train_target, ID_crystal, definition):
-        # ****** load the h5 file	
-        trained_df = pd.read_hdf(testh5, h5key)
-
-        Phi1, Phi2,  Phi_c, Theta1, Theta2, Theta_c = getCrystalPhiAndTheta(ID_crystal, definition)
-        print("Phi1:  ", Phi1, "  Phi2:  ", Phi2)
-        print("Theta1:  ", Theta1, "  Theta2:  ", Theta2)
-
-        if train_target == 'phi':
-            trained_df['res_rec'] = trained_df.phi-trained_df.mcPhi
-            trained_df['res_pre'] = trained_df.prePhi-trained_df.mcPhi
-            mc_col  = 'mcPhi'
-            rec_col = 'phi'
-            pre_col = 'prePhi'
-            angle1 = Phi1
-            angle2 = Phi2
-            angle_c = Phi_c
-            Range_Cry = [Phi1*0.99,Phi2*1.01]
-            Range = [-3.2, 3.2]
-        elif train_target == 'theta':
-            trained_df['res_rec'] = trained_df.theta-trained_df.mcTheta
-            trained_df['res_pre'] = trained_df.preTheta-trained_df.mcTheta
-            mc_col  = 'mcTheta'
-            rec_col = 'theta'
-            pre_col = 'preTheta'
-            angle1 = Theta1
-            angle2 = Theta2
-            angle_c = Theta_c
-            Range_Cry = [Theta1*0.99,Theta2*1.01]
-            Range = [0.4, 2.4]
-        else:
-            print("Wrong train target!")
-
-        print(trained_df[0:10])
-        # fig1 = plt.figure() 
-        # plt.style.use('ggplot')
-        
-        col_list = [rec_col,pre_col,mc_col]	
-        trained_df_sub = trained_df[col_list][(trained_df.mcPhi>=Phi1)&(trained_df.mcPhi<=Phi2)&(trained_df.mcTheta>=Theta1)&(trained_df.mcTheta<=Theta2)]
-
-        trained_df_sub.plot.hist(bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step')
-        legend = plt.legend(loc="best", labels=(r'$\theta_{rec}$', r'$\theta_{NN}$', r'$\theta_{Truth}$'))#(loc="best")
-        plt.plot([angle1, angle1],[0, 50], 'k--')
-        plt.text(angle1, 0, 'A', fontdict={'size': 10, 'color':  'blue'})
-        plt.plot([angle2, angle2],[0, 50], 'k--')
-        plt.text(angle2, 0, 'B', fontdict={'size': 10, 'color':  'blue'})
-        plt.plot([angle_c, angle_c],[0, 50], 'k--')
-        plt.text(angle_c, 0, 'C', fontdict={'size': 10, 'color':  'blue'})
-        plt.xlabel(r'$' + '\\'+ train_target + '$')
-        plt.ylabel(r'')
-        frame = legend.get_frame()
-        frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
-        plt.title('')	
-        plt.grid(True, alpha=0.8)
-        plt.savefig(trained_dist_c, dpi=300)
-
-	
-        # definitions for the axes
-        left, width    = 0.1, 0.65
-        bottom, height = 0.1, 0.65
-        bottom_h = left_h = left + width + 0.02
-        
-        rect_scatter = [left,   bottom,   width, height]
-        rect_histx   = [left,   bottom_h, width, 0.2]
-        rect_histy   = [left_h, bottom,   0.2,   height]
-
-        	
-        fig1 = plt.figure() 
-        axScatter = plt.axes(rect_scatter, xlabel=r'$'+ '\\' + train_target  + '_{rec}$ [rad]', ylabel=r'$'+ '\\' + train_target + '_{Truth}$ [rad]')
-        axHistx = plt.axes(rect_histx)
-        axHisty = plt.axes(rect_histy)
-        
-        # no labels
-        nullfmt = NullFormatter()         # no labels	
-        axHistx.xaxis.set_major_formatter(nullfmt)
-        axHisty.yaxis.set_major_formatter(nullfmt)
-        # the 2d histgram plot	
-        axScatter.hist2d(trained_df_sub[rec_col], trained_df_sub[mc_col],(50,50), range=[Range_Cry, Range_Cry],cmap = 'PuBu')
-        axScatter.grid(True, alpha=0.8)
-        
-        axHistx.hist(trained_df_sub[rec_col], bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step') 	
-        axHisty.hist(trained_df_sub[mc_col], bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step', orientation='horizontal') 	
-        axHistx.grid(True, alpha=0.8)
-        axHisty.grid(True, alpha=0.8)
-	     
-        axHistx.set_xlim(axScatter.get_xlim())
-        axHisty.set_ylim(axScatter.get_ylim())
-        plt.savefig(trained_dist_c_RecVsMC, dpi=300)
-
-
-        fig2 = plt.figure() 
-        axScatter = plt.axes(rect_scatter, xlabel=r'$'+ '\\' + train_target  + '_{NN}$ [rad]', ylabel=r'$'+ '\\' + train_target + '_{Truth}$ [rad]')
-        axHistx = plt.axes(rect_histx)
-        axHisty = plt.axes(rect_histy)
-        # no labels
-        nullfmt = NullFormatter()         # no labels	
-        axHistx.xaxis.set_major_formatter(nullfmt)
-        axHisty.yaxis.set_major_formatter(nullfmt)
-        # the 2d histgram plot	
-        current_cmap = plt.cm.get_cmap('PuBu')
-        current_cmap.set_bad(color='blue')
-        current_cmap.set_under(color='white', alpha=1.0)
-        axScatter.hist2d(trained_df_sub[pre_col],trained_df_sub[mc_col],(50,50), range = [Range_Cry, Range_Cry], cmap = current_cmap)
-        axScatter.grid(True, alpha=0.8)
-        
-        axHistx.hist(trained_df_sub[pre_col], bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step') 	
-        axHisty.hist(trained_df_sub[mc_col], bins=50, range=Range_Cry, alpha=1.0, linewidth=1, fill=False, histtype='step', orientation='horizontal') 	
-        axHistx.grid(True, alpha=0.8)
-        axHisty.grid(True, alpha=0.8)
-	     
-        axHistx.set_xlim(axScatter.get_xlim())
-        axHisty.set_ylim(axScatter.get_ylim())
-        plt.savefig(trained_dist_c_PreVsMC, dpi=300)
-
-        trained_df[col_list].plot.hist(bins=288, range = Range, alpha=1., linewidth=0.6, fill=False, histtype='step')
-        plt.xlabel(r'$'+'\\'+ train_target + '$')
-        plt.ylabel(r'')
-        legend = plt.legend(loc="best", labels=(r'$\theta_{rec}$', r'$\theta_{NN}$', r'$\theta_{Truth}$'))
-        frame = legend.get_frame()
-        frame.set_facecolor('none') # 璁剧疆鍥句緥legend鑳屾櫙閫忔槑
-        plt.title('')	
-        plt.grid(True, alpha=0.8)
-        plt.savefig(trained_dist, dpi=300)
-
-        trained_df[['res_rec', 'res_pre']].plot.hist(bins=200, range=[-0.03, 0.03], alpha=1.0, fill=False, histtype='step')
-        plt.xlabel(r'$' + '\\' + train_target + '$ - $' + '\\'+ train_target +'_{truth}$')
-        plt.ylabel(r'')
-        plt.legend(loc = 'best', labels=('res_rec', 'res_NN'))
-        plt.grid(True, alpha=0.8)
-        plt.savefig(trained_dist_res, dpi=300)
-
-        trained_df[['res_rec', 'res_pre']][(trained_df.mcPhi>=Phi1)&(trained_df.mcPhi<=Phi2)&(trained_df.mcTheta>=Theta1)&(trained_df.mcTheta<=Theta2)].plot.hist(bins = 50, range=[-0.03, 0.03], alpha=1.0, fill=False, histtype='step')
-        plt.xlabel(r'$' + '\\'+ train_target + '$- $'+'\\'+train_target+'_{truth}$')
-        plt.ylabel(r'')
-        plt.legend(loc = 'best', labels=('res_rec', 'res_NN'))
-        plt.grid(True, alpha=0.8)
-        plt.savefig(trained_dist_res_c, dpi=300)
-        
-        plt.show()
 
 
 def draw_threshold(testh5_thresholds, h5key, train_target, ID_crystal, definition):
@@ -659,17 +531,17 @@ Dir    = 'Energy' + energy + '/'
 if not os.path.isdir(Dir):
    os.mkdir(Dir)
 
-Dir_train = Dir + 'train8' + '/'
+Dir_train = Dir + 'train14' + '/'
 if not os.path.isdir(Dir_train):
    os.mkdir(Dir_train)
 
-train_target = 'theta'# 'phi' #'theta'
+train_target = 'theta'
 Dir_target = Dir_train + train_target + '/'  # + time.strftime( "%Y%m%d%H%M%S",time.localtime())
 if not os.path.isdir(Dir_target):
    os.mkdir(Dir_target)
 
 ID_train = '7151069798'  # '7151069798'   # '2927360606'   # '3975284924' 
-ID_test  = '7245655874'  # '7245655874'   # '4908190819'   # '0010973571' # '3975284924' #'2927360606' # '7151069798' 
+ID_test  = '9242450162'  # '7151069798'  # '7245655874'   # '4908190819'   # '0010973571' # '3975284924' #'2927360606' # '7151069798' 
 
 Dir_training = Dir_target + 'train_' + ID_train + '/'
 if not os.path.isdir(Dir_training):
@@ -691,14 +563,14 @@ if not os.path.isdir(Dir_threshold):
    os.mkdir(Dir_threshold)
 
 phase = '' # '_phase3'	
-trainh5file = 'B2APi0selection_' + ID_train + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold_train)  + '.h5'
-testh5file  = 'B2APi0selection_' + ID_test  + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold) + phase  + '.h5'
+trainh5file = 'B2APi0selection_' + ID_train + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold_train)  + '_c2626.h5'
+testh5file  = 'B2APi0selection_' + ID_test  + '_crystal_addmcMatchWeight_modified_threshold' + str(threshold) + phase  + '_c2626.h5'
 
 h5key_train = 'crystal_'+ ID_train
 h5key_test  = 'crystal_'+ ID_test
 
-#trainpklfile = Dir_train + 'NN_train_params_' + ID_train + '.pkl'
-trainpklfile = Dir_pkl + 'NN_train_params_epoch999.pkl'
+#trainpklfile = Dir_target + 'NN_train_params_' + ID_train + '.pkl'
+trainpklfile = Dir_pkl + 'NN_train_params_epoch99.pkl'
 
 validationh5 = Dir_training    + 'NN_train_test_' + ID_train + '.h5'
 train_lossh5 = Dir_training    + 'NN_train_loss_' + ID_train + '.h5'
@@ -711,20 +583,13 @@ trainedlossplot   = Dir_training + 'NN_train_test_' + ID_train + '_' + train_tar
 
 ID_crystal = '2626'  #'7090' # '5218' # '2626'
 definition = '2'
-trained_dist           = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + ID_crystal + '_' + definition + '.png'
-trained_dist_c         = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + ID_crystal + '_' + definition + '_crystal.png'
-trained_dist_c_RecVsMC = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + ID_crystal + '_' + definition + '_crystal_RecVsMC.png'
-trained_dist_c_PreVsMC = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + ID_crystal + '_' + definition + '_crystal_PreVsMC.png'
-trained_dist_res       = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + ID_crystal + '_' + definition + '_res.png'
-trained_dist_res_c     = Dir_threshold + 'NN_test_' + ID_test + '_' + train_target + '_' + ID_crystal + '_' + definition + '_res_crystal.png'
 trained_dist_res_c_thresholds  = Dir_test + 'NN_test_' + ID_test + '_' + train_target + '_' + ID_crystal + '_' + definition + '_res_crystal_thresholds.png'
 trained_dist_c_thresholds      = Dir_test + 'NN_test_' + ID_test + '_' + train_target + '_' + ID_crystal + '_' + definition + '_crystal_thresholds.png'
 trained_dist_res_c_phases      = Dir_test + 'NN_test_' + ID_test + '_' + train_target + '_' + ID_crystal + '_' + definition + '_res_crystal_phases.png'
 trained_dist_c_phases          = Dir_test + 'NN_test_' + ID_test + '_' + train_target + '_' + ID_crystal + '_' + definition + '_crystal_phases.png'
 
 #draw_result(validationh5, h5key_train, train_target, ID_crystal, definition)
-draw_result(testh5, h5key_test, train_target, ID_crystal, definition)
-#Draw_result.draw_result(testh5, h5key_test, train_target, ID_test, ID_crystal, definition, Dir_threshold, train_lossh5, h5key_train)
+draw_result(testh5, h5key_test, train_target, ID_test, ID_crystal, definition, Dir_threshold, train_lossh5, h5key_train)
 
 #application(testh5file, testh5,  h5key_test, trainpklfile, train_target)
 
